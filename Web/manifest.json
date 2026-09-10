@@ -1,0 +1,13 @@
+{
+  "name": "Calculadora de LIO — Catarata",
+  "short_name": "IOL Calc",
+  "description": "Cálculo de poder dióptrico de LIO, curva de defocus, simulação visual e planejamento tórico",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f1f5f9",
+  "theme_color": "#2563eb",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
