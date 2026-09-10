@@ -12,11 +12,14 @@ public struct EyeBiometry: Sendable, Hashable, Codable {
     public var acd: Double?
     /// Espessura do cristalino (mm).
     public var lensThickness: Double?
+    /// Paquimetria central (µm). Refina a Castrop; ausente → 500 µm.
+    public var centralCornealThickness: Double?
 
-    public init(axialLength: Double, keratometry: Double, acd: Double? = nil, lensThickness: Double? = nil) {
+    public init(axialLength: Double, keratometry: Double, acd: Double? = nil, lensThickness: Double? = nil, centralCornealThickness: Double? = nil) {
         self.axialLength = axialLength
         self.keratometry = keratometry
         self.acd = acd
         self.lensThickness = lensThickness
+        self.centralCornealThickness = centralCornealThickness
     }
 }

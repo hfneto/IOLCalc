@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; color: #0f172a; }
+    a { color: #2563eb; } a:hover { color: #1d4ed8; }
+    input { font: inherit; }
+  </style>
+</helmet>
+<div style="width: 1440px; height: 900px; background: #f1f5f9; display: flex; align-items: center; justify-content: center;">
+  <div style="width: 380px; background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 32px; display: flex; flex-direction: column; gap: 18px; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+      <svg width="56" height="56" viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="22" fill="#2563eb"></rect><ellipse cx="50" cy="50" rx="34" ry="22" fill="none" stroke="#fff" stroke-width="5"></ellipse><circle cx="50" cy="50" r="12" fill="#fff"></circle><circle cx="50" cy="50" r="6" fill="#1d4ed8"></circle></svg>
+      <div style="font-size: 18px; font-weight: 700;">Calculadora de LIO</div>
+      <div style="font-size: 13px; color: #64748b; text-align: center;">Entre com a sua conta do site para ativar a leitura de laudos por IA. Você só faz isso uma vez.</div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+      <div><div style="font-size: 12px; color: #64748b; font-weight: 600; margin-bottom: 4px;">E-mail</div><input value="hfneto@gmail.com" style="width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 9px; font-size: 14px; background: #fff;"></div>
+      <div><div style="font-size: 12px; color: #64748b; font-weight: 600; margin-bottom: 4px;">Senha</div><input type="password" value="••••••••••" style="width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 9px; font-size: 14px; background: #fff;"></div>
+    </div>
+    <button style="padding: 12px 14px; border-radius: 9px; border: 1px solid #2563eb; background: #2563eb; color: #fff; font-weight: 600; font-size: 14px;">Entrar</button>
+    <a href="#" style="font-size: 12.5px; text-align: center;">Usar sem leitura por IA</a>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

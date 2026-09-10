@@ -26,17 +26,29 @@ enum CalculatorPage {
 
 /// A calculadora (página web embutida) dentro de um `WKWebView`.
 struct CalculatorWebView: PlatformViewRepresentable {
+    let nativeState: NativeState
     /// Chamado quando a página abre uma janela vazia (relatório) e escreve nela.
     let onPopup: (WKWebView) -> Void
+    let onOpenCalculator: (ExternalCalculator) -> Void
+    let onLogout: () -> Void
 
-    func makeCoordinator() -> WebCoordinator { WebCoordinator(onPopup: onPopup) }
+    func makeCoordinator() -> WebCoordinator {
+        WebCoordinator(onPopup: onPopup, onOpenCalculator: onOpenCalculator, onLogout: onLogout)
+    }
+
+    private func update(_ view: WKWebView, _ context: Context) {
+        if context.coordinator.injectedState != nativeState {
+            context.coordinator.inject(nativeState, into: view)
+            view.loadHTMLString(CalculatorPage.html(), baseURL: CalculatorPage.baseURL)
+        }
+    }
 
     #if os(iOS)
-    func makeUIView(context: Context) -> WKWebView { context.coordinator.makeWebView() }
-    func updateUIView(_ view: WKWebView, context: Context) {}
+    func makeUIView(context: Context) -> WKWebView { context.coordinator.makeWebView(state: nativeState) }
+    func updateUIView(_ view: WKWebView, context: Context) { update(view, context) }
     #else
-    func makeNSView(context: Context) -> WKWebView { context.coordinator.makeWebView() }
-    func updateNSView(_ view: WKWebView, context: Context) {}
+    func makeNSView(context: Context) -> WKWebView { context.coordinator.makeWebView(state: nativeState) }
+    func updateNSView(_ view: WKWebView, context: Context) { update(view, context) }
     #endif
 }
 
@@ -53,14 +65,27 @@ struct ExistingWebView: PlatformViewRepresentable {
     #endif
 }
 
-final class WebCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
+final class WebCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
     let onPopup: (WKWebView) -> Void
+    let onOpenCalculator: (ExternalCalculator) -> Void
+    let onLogout: () -> Void
+    private(set) var injectedState: NativeState?
 
-    init(onPopup: @escaping (WKWebView) -> Void) {
+    init(onPopup: @escaping (WKWebView) -> Void, onOpenCalculator: @escaping (ExternalCalculator) -> Void, onLogout: @escaping () -> Void) {
         self.onPopup = onPopup
+        self.onOpenCalculator = onOpenCalculator
+        self.onLogout = onLogout
     }
 
-    func makeWebView() -> WKWebView {
+    /// Reinstala o script `window.IOL_NATIVE` (roda antes da página, a cada carga).
+    func inject(_ state: NativeState, into webView: WKWebView) {
+        let ucc = webView.configuration.userContentController
+        ucc.removeAllUserScripts()
+        ucc.addUserScript(WKUserScript(source: state.script, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        injectedState = state
+    }
+
+    func makeWebView(state: NativeState) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.preferences.javaScriptCanOpenWindowsAutomatically = true
         config.defaultWebpagePreferences.allowsContentJavaScript = true
@@ -68,8 +93,11 @@ final class WebCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         #if os(iOS)
         config.allowsInlineMediaPlayback = true
         #endif
+        config.userContentController.add(self, name: "openCalc")
+        config.userContentController.add(self, name: "logout")
 
         let webView = WKWebView(frame: .zero, configuration: config)
+        inject(state, into: webView)
         webView.navigationDelegate = self
         webView.uiDelegate = self
         #if DEBUG
@@ -111,6 +139,24 @@ final class WebCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         #endif
         onPopup(popup)
         return popup
+    }
+
+    // MARK: - Mensagens da página (window.webkit.messageHandlers.*)
+
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        switch message.name {
+        case "logout":
+            onLogout()
+        case "openCalc":
+            guard let body = message.body as? [String: Any],
+                  let name = body["name"] as? String,
+                  let urlString = body["url"] as? String, let url = URL(string: urlString),
+                  let fill = body["fill"] as? String,
+                  let data = body["data"], let json = try? JSONSerialization.data(withJSONObject: data) else { return }
+            onOpenCalculator(ExternalCalculator(name: name, url: url, dataJSON: String(decoding: json, as: UTF8.self), fillSource: fill))
+        default:
+            break
+        }
     }
 
     // MARK: - alert()/confirm(): o WKWebView descarta em silêncio sem isto

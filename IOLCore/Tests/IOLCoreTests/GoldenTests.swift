@@ -115,6 +115,15 @@ struct SelfTestSnapshots {
         #expect(IOLFormulas.recommendedFormulas(axialLength: 21) == [.hofferQ, .haigis, .castrop])
     }
 
+    @Test("Castrop com paquimetria medida (valores do JS: 541, ausente e 650 µm)")
+    func castropCCT() {
+        let f: (Double?) -> Double = { IOLFormulas.castrop(axialLength: 23.62, keratometry: 43.675, aConstant: 119.1, target: 0, acd: 3.21, lensThickness: 4.52, cctMicrons: $0) }
+        #expect(abs(f(541) - 20.272993615102237) < 1e-9)
+        #expect(abs(f(nil) - 20.29365986600856) < 1e-9)
+        #expect(abs(f(650) - 20.218168639809953) < 1e-9)
+        #expect(f(500) == f(nil))
+    }
+
     @Test("Catálogo: 20 lentes, ids únicos, 9 pontos de defocus")
     func catalog() {
         #expect(LensCatalog.all.count == 20)

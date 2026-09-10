@@ -1,0 +1,11 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 1440, "h": 900, "title": "Desktop · seções 1 a 3" },
+    { "file": "Login.dc.html", "x": 1540, "y": 0, "w": 1440, "h": 900, "title": "Login (uma vez)" },
+    { "file": "Simulacao.dc.html", "x": 0, "y": 1040, "w": 1160, "h": 560, "title": "Simulação visual (quadros ampliados)" }
+  ],
+  "annotations": [
+    { "id": "nota-direcao", "x": 1200, "y": 1040, "w": 300, "text": "Direção: mesma identidade da calculadora web (azul 2563eb, cartões brancos, 14px de raio), com barra lateral de seções no desktop.\n\nMudanças: CCT na biometria; método de biometria vira um seletor com ΔA automático; sugestão de poder = primeira lente sem hipermetropia; comparação de lentes vira gaveta; razão de toricidade vai para 'avançado'; login uma única vez." }
+  ],
+  "launch": { "view": "canvas" }
+}

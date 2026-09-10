@@ -114,9 +114,10 @@ public enum IOLFormulas {
         static let liouBrennan = 6.40 / 7.77
     }
 
-    static func castropRaw(axialLength al: Double, keratometry k: Double, h: Double, target rTarget: Double, acd acdPre: Double?, lensThickness lt: Double?) -> Double {
+    static func castropRaw(axialLength al: Double, keratometry k: Double, h: Double, target rTarget: Double, acd acdPre: Double?, lensThickness lt: Double?, cctMicrons: Double? = nil) -> Double {
         let acd = usable(acdPre) ?? 3.37
         let ltu = usable(lt) ?? 4.7
+        let cct = usable(cctMicrons).map { $0 / 1000 } ?? Castrop.cct
         let rca = 337.5 / k
         let pca = (Castrop.nC - 1) * 1000 / rca
         let rcp = rca * Castrop.liouBrennan
@@ -124,9 +125,9 @@ public enum IOLFormulas {
         let elp = acd + Castrop.c * ltu + h
         let rc = toCornealPlane(rTarget - Castrop.r)
         var v = rc + pca
-        v = v / (1 - (Castrop.cct / Castrop.nC / 1000) * v)
+        v = v / (1 - (cct / Castrop.nC / 1000) * v)
         v = v + pcp
-        v = v / (1 - ((elp - Castrop.cct) / Castrop.n / 1000) * v)
+        v = v / (1 - ((elp - cct) / Castrop.n / 1000) * v)
         return 1000 * Castrop.n / (al - elp) - v
     }
 
@@ -143,8 +144,9 @@ public enum IOLFormulas {
         return (lo + hi) / 2
     }
 
-    public static func castrop(axialLength al: Double, keratometry k: Double, aConstant a: Double, target r: Double, acd: Double?, lensThickness lt: Double?) -> Double {
-        castropRaw(axialLength: al, keratometry: k, h: castropH(aConstant: a), target: r, acd: acd, lensThickness: lt)
+    /// `cctMicrons`: paquimetria central medida (µm); ausente → 0,5 mm do modelo.
+    public static func castrop(axialLength al: Double, keratometry k: Double, aConstant a: Double, target r: Double, acd: Double?, lensThickness lt: Double?, cctMicrons: Double? = nil) -> Double {
+        castropRaw(axialLength: al, keratometry: k, h: castropH(aConstant: a), target: r, acd: acd, lensThickness: lt, cctMicrons: cctMicrons)
     }
 
     // MARK: - Haigis
@@ -191,7 +193,7 @@ public enum IOLFormulas {
         case .holladay1WK: return holladay1WangKoch(axialLength: al, keratometry: k, aConstant: a, target: r)
         case .hofferQ: return hofferQ(axialLength: al, keratometry: k, aConstant: a, target: r)
         case .haigis: return haigis(axialLength: al, keratometry: k, aConstant: a, target: r, acd: eye.acd)
-        case .castrop: return castrop(axialLength: al, keratometry: k, aConstant: a, target: r, acd: eye.acd, lensThickness: eye.lensThickness)
+        case .castrop: return castrop(axialLength: al, keratometry: k, aConstant: a, target: r, acd: eye.acd, lensThickness: eye.lensThickness, cctMicrons: eye.centralCornealThickness)
         }
     }
 
