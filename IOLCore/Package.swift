@@ -12,7 +12,7 @@ let package = Package(
         .testTarget(
             name: "IOLCoreTests",
             dependencies: ["IOLCore"],
-            resources: [.copy("Resources/golden.json")]
+            resources: [.copy("Resources/golden.json"), .copy("Resources/planning.json")]
         ),
     ]
 )
