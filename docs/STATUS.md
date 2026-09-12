@@ -3,15 +3,11 @@
 Sessões: https://claude.ai/code/session_0153A2Tu3tz7zphMYzUt9NQP (Fase 0) e
 https://claude.ai/code/session_01WvfqNJWEFnjbtQFmfWf4dC (Fases 3 e 4).
 
-Todo o trabalho está no branch `worktree-biometria-swiftui` (worktree em
-`.claude/worktrees/biometria-swiftui`). `main` parou em `9a96f17` e o checkout principal
-tem cópias sem commit dos arquivos da Fase 0 (já commitados no branch). Para trazer tudo
-para `main`:
+O trabalho é feito no branch `worktree-biometria-swiftui` (worktree em
+`.claude/worktrees/biometria-swiftui`) e levado a `main` por fast-forward:
 
 ```bash
-cd ~/Developer/IOLCalc
-git restore . && git clean -f IOLCalc/AIReader.swift docs/ROADMAP.md && git clean -fd Tools
-git merge --ff-only worktree-biometria-swiftui
+cd ~/Developer/IOLCalc && git merge --ff-only worktree-biometria-swiftui
 ```
 
 ## Feito
@@ -34,8 +30,8 @@ git merge --ff-only worktree-biometria-swiftui
   https://claude.ai/code/artifact/53b9c69e-7379-446f-951d-d1488f7621e4
 
 ## Pendências do usuário
-1. Rodar os comandos acima para levar o branch a `main`.
-2. Abrir o app, colar a chave da API (console.anthropic.com) e ler um laudo real (página web).
+1. Rodar o fast-forward acima.
+2. Abrir o app, colar a chave da API (console.anthropic.com) e ler um laudo real na tela nativa.
 3. Fase 1 do roadmap: revogar a chave que estava no WordPress, desativar o plugin, avisar em /calculo.
 4. Apple ID no Xcode + Team no target para rodar no iPhone.
 5. Opcional: renomear `Auth.swift` → `APIKeyStore.swift` e `LoginView.swift` → `APIKeyView.swift`.
