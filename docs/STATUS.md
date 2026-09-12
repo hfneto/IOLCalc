@@ -1,30 +1,52 @@
-# Estado do projeto — 11/09/2026
+# Estado do projeto — 11/09/2026 (noite)
 
-Sessão anterior: https://claude.ai/code/session_0153A2Tu3tz7zphMYzUt9NQP
+Sessões: https://claude.ai/code/session_0153A2Tu3tz7zphMYzUt9NQP (Fase 0) e
+https://claude.ai/code/session_01WvfqNJWEFnjbtQFmfWf4dC (Fases 3 e 4).
+
+Todo o trabalho está no branch `worktree-biometria-swiftui` (worktree em
+`.claude/worktrees/biometria-swiftui`). `main` parou em `9a96f17` e o checkout principal
+tem cópias sem commit dos arquivos da Fase 0 (já commitados no branch). Para trazer tudo
+para `main`:
+
+```bash
+cd ~/Developer/IOLCalc
+git restore . && git clean -f IOLCalc/AIReader.swift docs/ROADMAP.md && git clean -fd Tools
+git merge --ff-only worktree-biometria-swiftui
+```
 
 ## Feito
 - App híbrido iOS/macOS em `~/Developer/IOLCalc` (Xcode 26.6).
-- **11/09:** leitura por IA direto no app. Chave da API da Anthropic no Keychain (`Auth.swift`,
+- **Fase 0:** leitura por IA direto no app. Chave da API da Anthropic no Keychain (`Auth.swift`,
   `APIKeyStore`), chamada em Swift (`AIReader.swift`), bridge `aiRead` no `WKWebView`. Login por
   e-mail/senha e plugin WordPress v2.2 abandonados; `server/` é obsoleto.
-- CCT, método de biometria com ΔA automático, sugestão "primeira lente sem hipermetropia",
-  calculadoras oficiais preenchidas dentro do app, comparador em gaveta, tórica com
-  plataforma/razão em "avançado", simulação em quadros ampliados, barra lateral no desktop.
-- `IOLCore` (Swift): fórmulas + CCT, 8 testes passando (`cd IOLCore && swift test`).
-- Roadmap de saída do WordPress em `docs/ROADMAP.md`.
-- Canvas de design: https://claude.ai/code/artifact/53b9c69e-7379-446f-951d-d1488f7621e4
+- **Fase 3:** seções 1 a 3 nativas em `IOLCalc/Native/` (biometria OD/OE com CCT e TK, método de
+  biometria com ΔA, LIO/constante A/alvo, sugestão "primeira lente sem hipermetropia", tabela por
+  fórmula, alertas). `IOLCore/Planning.swift` com paridade 1e-9 contra o JavaScript.
+- **Fase 4:** seção 5 nativa (curva de defocus em Swift Charts, régua de residual, astigmatismo,
+  métricas longe/66 cm/40 cm/estereopsia) e gaveta "Comparar 2 lentes no mesmo olho".
+- Seletor "Página web / Nativo · beta" no topo (`RootView`); a página web continua completa.
+- `IOLCore`: 16 testes passando (`cd IOLCore && swift test`).
+- Roadmap de saída do WordPress em `docs/ROADMAP.md`; canvas de design:
+  https://claude.ai/code/artifact/53b9c69e-7379-446f-951d-d1488f7621e4
 
 ## Pendências do usuário
-1. Abrir o app, colar a chave da API (console.anthropic.com) e ler um laudo real.
-2. Fase 1 do roadmap: revogar a chave que estava no WordPress, desativar o plugin, avisar em /calculo.
-3. Apple ID no Xcode + Team no target para rodar no iPhone.
-4. Opcional: renomear `Auth.swift` → `APIKeyStore.swift` e `LoginView.swift` → `APIKeyView.swift`
-   no Xcode (os arquivos já têm o conteúdo novo; só o nome ficou antigo).
+1. Rodar os comandos acima para levar o branch a `main`.
+2. Abrir o app, colar a chave da API (console.anthropic.com) e ler um laudo real (página web).
+3. Fase 1 do roadmap: revogar a chave que estava no WordPress, desativar o plugin, avisar em /calculo.
+4. Apple ID no Xcode + Team no target para rodar no iPhone.
+5. Opcional: renomear `Auth.swift` → `APIKeyStore.swift` e `LoginView.swift` → `APIKeyView.swift`.
 
 ## Próximos passos sugeridos
-- Fase 2 do roadmap (origem própria + migrar localStorage), depois fase 3 (biometria em SwiftUI).
+- Fase 5: "Ler laudo com IA" na tela nativa (câmera/arquivo → `AIReader` → campos do
+  `CalculatorModel`), depois Fase 6 (tórica + simulação em `Canvas`), Fase 7 (relatório) e
+  Fase 2 (origem própria) antes de remover o `index.html`.
+- Seção 4 (calculadoras oficiais) na tela nativa: reaproveitar `CalculatorFillSheet` com os
+  dados do `CalculatorModel`.
 
-## Como testar a página sem abrir o app
-`Tools/webtest.swift` carrega `IOLCalc/index.html` num WKWebView headless com um
-bridge `aiRead` falso e confere que a leitura preenche os campos. Compilar com
-`swiftc -O Tools/webtest.swift -o /tmp/webtest` e rodar `/tmp/webtest`.
+## Como testar sem abrir o app
+- Página web: `Tools/webtest.swift` (WKWebView headless com bridge `aiRead` falso). Compilar com
+  `swiftc -O Tools/webtest.swift -o /tmp/webtest` e rodar `/tmp/webtest`.
+- Tela nativa (DEBUG/macOS): `-iol_sample YES -iol_native_ui YES -iol_snapshot <png>` grava a
+  janela em PNG dentro de `~/Library/Containers/br.com.drhallim.IOLCalc/Data/`; a captura não
+  redesenha controles AppKit/eixos do Charts após rolagem, por isso `-iol_chart_snapshot <png>`
+  renderiza só o gráfico com `ImageRenderer`.

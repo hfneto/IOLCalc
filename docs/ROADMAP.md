@@ -40,13 +40,13 @@ Nada no app depende disto; é higiene e segurança.
 
 Ao fim desta fase o app é 100% autônomo; o site pode sair do ar sem efeito.
 
-## Fase 3 — Biometria e cálculo em SwiftUI (2–3 sessões)
+## Fase 3 — Biometria e cálculo em SwiftUI ✅ (11/09/2026, seções 1–3 em `IOLCalc/Native/`)
 
 O coração da migração nativa. Tela de biometria (OD/OE, CCT, TK, método com ΔA automático),
 seleção de lente e alvo, e cálculo do poder usando `IOLCore`, que já tem paridade com o JS.
 Sugestão "primeira lente sem hipermetropia" e refração prevista por inversão.
 
-## Fase 4 — Defocus, binocular e comparador (1–2 sessões)
+## Fase 4 — Defocus, binocular e comparador ✅ (11/09/2026, Swift Charts)
 
 Curva de defocus e AV binocular em Swift Charts; comparador de lentes em gaveta, como hoje.
 
