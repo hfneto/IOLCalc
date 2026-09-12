@@ -29,16 +29,17 @@ A Fase 6 foi feita direto em `main` (o worktree `worktree-biometria-swiftui` em
     "overrides" em `ToricForm`, o equivalente do `dataset.touched`), plataforma/razão em "avançado",
     "sugerir ideal", "alinhar ao astig.", copiar OD↔OE, diagrama em `Canvas` com arrasto do eixo da
     LIO e da incisão, métricas e nota de desalinhamento.
-  - `SimulationSection.swift` (refeita em 12/09 à tarde a pedido do usuário — "as simulações são muito
-    ruins, precisamos de imagens realistas", depois "cafeteria de dia; direção em 1ª pessoa à noite
-    com carro à frente, placa, semáforo, GPS e celular na mão"): duas cenas fotográficas (Unsplash) com
-    as três distâncias em camadas — dia: cafeteria (celular na mão 40 cm, e-mail no notebook 66 cm,
-    rua pela janela); noite: dirigindo (celular, GPS no painel 66 cm, carro à frente com placa, luzes).
-    Cada camada desfocada pela AV da sua distância; astigmatismo por média aditiva de 8 cópias (com
-    "over" a cobertura ficava em 66 % e o fundo vazava como névoa); halos/anéis/starburst só nas
-    luzes marcadas (o brilho por filtro `luminanceToAlpha` clareava o céu inteiro e foi removido).
-    Ferramentas usadas (no scratchpad da sessão, não versionadas): folha de contato das buscas do
-    Unsplash e `tools.swift` (recorte da mão com Vision, detecção de luzes, prévia de máscaras).
+  - `SimulationSection.swift` (refeita duas vezes em 12/09 a pedido do usuário; versão final à
+    noite): cenas geradas com o Gemini (chave da API em `~/.config/iolcalc/gemini.key`, projeto com
+    cobrança ativada; script `docs/gen-cena.py`, prompts em `docs/simulacao-prompts.md`). Dia:
+    cafeteria; noite: direção em 1ª pessoa — exatamente os elementos que o usuário pediu. Camadas:
+    foto inteira (66 cm) → polígonos "longe" → polígonos "perto" (mão com celular); telas em branco
+    na foto preenchidas pelo app com transformação afim (`Quad`); a tela a 66 cm é desenhada antes
+    do celular e recortada fora da região "perto". Astigmatismo por média aditiva; halos só nas luzes
+    marcadas. Para reposicionar telas/máscaras: recortes com grade (`tools grid`) e prévias de máscara
+    (`tools mask`) — as ferramentas ficaram no scratchpad da sessão; são ~150 linhas de Swift fáceis
+    de recriar (recorte com grade numerada, polígono translúcido sobre a foto, detecção de manchas
+    claras para as luzes).
   - `ToricTests` (362 casos + razões + Abulafia-Koch, gerados por `docs/toric-generator.js` no jsc)
     e `SimulationTests`. `IOLCore`: 21 testes passando (`cd IOLCore && swift test`).
 - **Fase 7:** relatório nativo e casos salvos.
