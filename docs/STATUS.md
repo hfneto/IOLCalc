@@ -36,10 +36,11 @@ A Fase 6 foi feita direto em `main` (o worktree `worktree-biometria-swiftui` em
     foto inteira (66 cm) → polígonos "longe" → polígonos "perto" (mão com celular); telas em branco
     na foto preenchidas pelo app com transformação afim (`Quad`); a tela a 66 cm é desenhada antes
     do celular e recortada fora da região "perto". Astigmatismo por média aditiva; halos só nas luzes
-    marcadas. Para reposicionar telas/máscaras: recortes com grade (`tools grid`) e prévias de máscara
-    (`tools mask`) — as ferramentas ficaram no scratchpad da sessão; são ~150 linhas de Swift fáceis
-    de recriar (recorte com grade numerada, polígono translúcido sobre a foto, detecção de manchas
-    claras para as luzes).
+    marcadas. Telas: os quatro cantos são medidos com `Tools/scene-tools.swift screen` (preenchimento por
+    cor a partir de um ponto dentro da tela em branco) e o conteúdo é projetado por homografia
+    (`GraphicsContext.Filter.projectionTransform`), que respeita a perspectiva — a versão afim de
+    três cantos ficava desalinhada, como o usuário apontou. Máscaras "longe"/"perto" conferidas com
+    `scene-tools mask`; luzes com `scene-tools blobs`.
   - `ToricTests` (362 casos + razões + Abulafia-Koch, gerados por `docs/toric-generator.js` no jsc)
     e `SimulationTests`. `IOLCore`: 21 testes passando (`cd IOLCore && swift test`).
 - **Fase 7:** relatório nativo e casos salvos.

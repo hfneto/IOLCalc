@@ -87,13 +87,14 @@ struct SimulationScene {
         let color: Color
     }
 
-    /// Quadrilátero de uma tela na foto (cantos superior-esquerdo, superior-direito e
-    /// inferior-esquerdo, normalizados): o conteúdo é desenhado com a transformação afim
-    /// correspondente (o quarto canto fica implícito; as telas estão quase de frente).
+    /// Os quatro cantos de uma tela na foto (normalizados, na ordem superior-esquerdo, superior-direito,
+    /// inferior-esquerdo, inferior-direito). O conteúdo é desenhado num retângulo local e projetado
+    /// para o quadrilátero por uma homografia, respeitando a perspectiva da foto.
     struct Quad {
-        let tl: CGPoint, tr: CGPoint, bl: CGPoint
-        init(_ tl: (Double, Double), _ tr: (Double, Double), _ bl: (Double, Double)) {
-            self.tl = CGPoint(x: tl.0, y: tl.1); self.tr = CGPoint(x: tr.0, y: tr.1); self.bl = CGPoint(x: bl.0, y: bl.1)
+        let tl: CGPoint, tr: CGPoint, bl: CGPoint, br: CGPoint
+        init(_ tl: (Double, Double), _ tr: (Double, Double), _ bl: (Double, Double), _ br: (Double, Double)) {
+            self.tl = CGPoint(x: tl.0, y: tl.1); self.tr = CGPoint(x: tr.0, y: tr.1)
+            self.bl = CGPoint(x: bl.0, y: bl.1); self.br = CGPoint(x: br.0, y: br.1)
         }
     }
 
@@ -114,8 +115,8 @@ struct SimulationScene {
         farPolygons: [poly([(0.0, 0.0), (1.0, 0.0), (1.0, 0.73), (0.72, 0.62), (0.53, 0.50), (0.30, 0.54), (0.0, 0.60)])],
         nearPolygons: [poly([(0.452, 0.515), (0.567, 0.540), (0.585, 0.62), (0.60, 0.72), (0.585, 0.90), (0.56, 1.0), (0.27, 1.0),
                              (0.30, 0.86), (0.34, 0.72), (0.37, 0.63), (0.42, 0.62), (0.455, 0.57)])],
-        phoneScreen: Quad((0.456, 0.519), (0.556, 0.543), (0.390, 0.905)),
-        midScreen: Quad((0.301, 0.338), (0.530, 0.326), (0.308, 0.552)),
+        phoneScreen: Quad((0.4667, 0.5296), (0.5631, 0.5583), (0.4071, 0.8870), (0.5161, 0.9259)),
+        midScreen: Quad((0.3083, 0.3500), (0.5167, 0.3407), (0.3173, 0.5583), (0.5262, 0.5278)),
         lights: [])
 
     /// Direção à noite (imagem gerada com o Gemini a partir da descrição do usuário).
@@ -123,8 +124,8 @@ struct SimulationScene {
         imageName: "sim-night", night: true,
         farPolygons: [poly([(0.04, 0.03), (1.0, 0.0), (1.0, 0.58), (0.72, 0.56), (0.40, 0.56), (0.17, 0.56), (0.05, 0.45)])],
         nearPolygons: [poly([(0.72, 0.365), (0.885, 0.36), (0.89, 0.50), (1.0, 0.56), (1.0, 1.0), (0.70, 1.0), (0.70, 0.55)])],
-        phoneScreen: Quad((0.735, 0.444), (0.870, 0.433), (0.734, 0.809)),
-        midScreen: Quad((0.589, 0.761), (0.769, 0.761), (0.589, 0.912)),
+        phoneScreen: Quad((0.7351, 0.4343), (0.8655, 0.4306), (0.7405, 0.7991), (0.8750, 0.7972)),
+        midScreen: Quad((0.5935, 0.7602), (0.7660, 0.7625), (0.5964, 0.9065), (0.7680, 0.9120)),
         lights: [
             // semáforo
             Light(x: 0.543, y: 0.022, radius: 0.012, strength: 1.2, color: Color(red: 1, green: 0.25, blue: 0.2)),
@@ -263,17 +264,51 @@ struct SimulationSceneView: View {
         drawInQuad(&c, scene.phoneScreen) { c, w, h in drawPhoneUI(&c, w: w, h: h) }
     }
 
-    /// Aplica a transformação afim do quadrilátero e desenha o conteúdo num retângulo local (0,0,w,h).
+    /// Desenha o conteúdo num retângulo local (0,0,w,h) e projeta-o no quadrilátero da foto com
+    /// uma homografia (filtro `projectionTransform`), para acompanhar a perspectiva da tela.
     private func drawInQuad(_ ctx: inout GraphicsContext, _ q: SimulationScene.Quad, _ body: (inout GraphicsContext, Double, Double) -> Void) {
-        let o = CGPoint(x: q.tl.x * W, y: q.tl.y * H)
-        let ax = CGPoint(x: (q.tr.x - q.tl.x) * W, y: (q.tr.y - q.tl.y) * H)
-        let ay = CGPoint(x: (q.bl.x - q.tl.x) * W, y: (q.bl.y - q.tl.y) * H)
-        let w = hypot(ax.x, ax.y), h = hypot(ay.x, ay.y)
+        let tl = CGPoint(x: q.tl.x * W, y: q.tl.y * H), tr = CGPoint(x: q.tr.x * W, y: q.tr.y * H)
+        let bl = CGPoint(x: q.bl.x * W, y: q.bl.y * H), br = CGPoint(x: q.br.x * W, y: q.br.y * H)
+        let w = (hypot(tr.x - tl.x, tr.y - tl.y) + hypot(br.x - bl.x, br.y - bl.y)) / 2
+        let h = (hypot(bl.x - tl.x, bl.y - tl.y) + hypot(br.x - tr.x, br.y - tr.y)) / 2
+        guard let m = Self.homography(from: [CGPoint(x: 0, y: 0), CGPoint(x: w, y: 0), CGPoint(x: 0, y: h), CGPoint(x: w, y: h)], to: [tl, tr, bl, br]) else { return }
         ctx.drawLayer { l in
-            l.concatenate(CGAffineTransform(a: ax.x / w, b: ax.y / w, c: ay.x / h, d: ay.y / h, tx: o.x, ty: o.y))
+            // ProjectionTransform aplica p' = p · M (vetor-linha): M é a transposta da matriz linha-major.
+            var t = ProjectionTransform()
+            t.m11 = m[0]; t.m12 = m[3]; t.m13 = m[6]
+            t.m21 = m[1]; t.m22 = m[4]; t.m23 = m[7]
+            t.m31 = m[2]; t.m32 = m[5]; t.m33 = m[8]
+            l.addFilter(.projectionTransform(t))
             l.clip(to: Path(roundedRect: CGRect(x: 0, y: 0, width: w, height: h), cornerRadius: min(w, h) * 0.06))
             body(&l, w, h)
         }
+    }
+
+    /// Homografia 3×3 (linha-major: [a b c; d e f; g h 1]) que leva 4 pontos de origem aos 4 de destino.
+    static func homography(from src: [CGPoint], to dst: [CGPoint]) -> [CGFloat]? {
+        // 8 equações lineares em (a,b,c,d,e,f,g,h)
+        var A = [[Double]](); var B = [Double]()
+        for i in 0..<4 {
+            let x = Double(src[i].x), y = Double(src[i].y), u = Double(dst[i].x), v = Double(dst[i].y)
+            A.append([x, y, 1, 0, 0, 0, -u * x, -u * y]); B.append(u)
+            A.append([0, 0, 0, x, y, 1, -v * x, -v * y]); B.append(v)
+        }
+        // eliminação de Gauss com pivotamento parcial
+        let n = 8
+        for col in 0..<n {
+            var piv = col
+            for r in col + 1..<n where abs(A[r][col]) > abs(A[piv][col]) { piv = r }
+            if abs(A[piv][col]) < 1e-12 { return nil }
+            if piv != col { A.swapAt(piv, col); B.swapAt(piv, col) }
+            for r in 0..<n where r != col {
+                let f = A[r][col] / A[col][col]
+                if f == 0 { continue }
+                for c in col..<n { A[r][c] -= f * A[col][c] }
+                B[r] -= f * B[col]
+            }
+        }
+        let sol = (0..<n).map { B[$0] / A[$0][$0] }
+        return (sol + [1]).map { CGFloat($0) }
     }
 
     /// Conversa de mensagens (texto ≈ 8 % da largura da tela, como 15 pt num celular a 40 cm).
