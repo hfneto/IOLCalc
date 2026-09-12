@@ -124,6 +124,7 @@ struct SimulationTests {
         #expect(VisualSimulation.directionalBlur(cylinder: 10) == 120)
         #expect(VisualSimulation.haloIntensity(dysphotopsia: 3, mode: 1) == 1)
         #expect(VisualSimulation.contrast(dysphotopsia: 3, night: true) == 0.66)
-        #expect(VisualSimulation.tiles.map(\.defocus) == [-2.5, -1.43, -1.33, 0])
+        #expect(VisualSimulation.distances.map(\.defocus) == [-2.5, -1.33, 0])
+        #expect(abs(VisualSimulation.blurSigma(logMAR: 0.3, pixelsPerArcMinute: 2) - 0.6 * (pow(10, 0.3) - 1) * 2) < 1e-12)
     }
 }

@@ -29,9 +29,12 @@ A Fase 6 foi feita direto em `main` (o worktree `worktree-biometria-swiftui` em
     "overrides" em `ToricForm`, o equivalente do `dataset.touched`), plataforma/razão em "avançado",
     "sugerir ideal", "alinhar ao astig.", copiar OD↔OE, diagrama em `Canvas` com arrasto do eixo da
     LIO e da incisão, métricas e nota de desalinhamento.
-  - `SimulationSection.swift`: quatro quadros em `Canvas` (celular 40 cm, notebook 70 cm, GPS 75 cm,
-    rua 50 m) em tamanho físico, desfoque pela AV binocular, arrasto do astigmatismo (olho de menor
-    cilindro), contraste das difrativas, dia/noite e halos com 3 modos de variação individual.
+  - `SimulationSection.swift` (refeita em 12/09 à tarde a pedido do usuário — "as simulações são muito
+    ruins, precisamos de imagens realistas"): duas cenas fotográficas (dia e noite, Unsplash) com as
+    três distâncias em camadas (celular na mão a 40 cm, painel a 75 cm, rua pelo vidro), cada camada
+    desfocada pela AV da sua distância; astigmatismo por média aditiva de 8 cópias (com "over" a
+    cobertura ficava em 66 % e o fundo vazava como névoa); halos/anéis/starburst só nas luzes
+    marcadas (o brilho por filtro `luminanceToAlpha` clareava o céu inteiro e foi removido).
   - `ToricTests` (362 casos + razões + Abulafia-Koch, gerados por `docs/toric-generator.js` no jsc)
     e `SimulationTests`. `IOLCore`: 21 testes passando (`cd IOLCore && swift test`).
 - **Fase 7:** relatório nativo e casos salvos.
@@ -43,6 +46,8 @@ A Fase 6 foi feita direto em `main` (o worktree `worktree-biometria-swiftui` em
     régua, astigmatismo, tórica, simulação e comparador; JSON em `Application Support/IOLCalc/`.
     Botões "Relatório" e "Casos" na barra do paciente (`NativeCalculatorView.topBar`).
   - Verificado por `-iol_report_pdf` (2 páginas A4 no caso de exemplo) e `-iol_cases_test` (OK).
+  - Ajustes pedidos depois: sem linhas de assinatura; só entram os olhos com LIO escolhida; a seção
+    tórica só aparece quando há cilindro > 0 em algum olho.
 - Seletor "Página web / Nativo · beta" no topo (`RootView`); a página web continua completa.
 - Roadmap de saída do WordPress em `docs/ROADMAP.md`; canvas de design:
   https://claude.ai/code/artifact/53b9c69e-7379-446f-951d-d1488f7621e4
@@ -73,11 +78,13 @@ A Fase 6 foi feita direto em `main` (o worktree `worktree-biometria-swiftui` em
 - Página web: `Tools/webtest.swift` (WKWebView headless com bridge `aiRead` falso). Compilar com
   `swiftc -O Tools/webtest.swift -o /tmp/webtest` e rodar `/tmp/webtest`.
 - Tela nativa (DEBUG/macOS): sempre com `-iol_no_keychain YES` quando rodar do terminal (o binário
-  recém-compilado faz o Keychain pedir confirmação e a captura trava).
+  recém-compilado faz o Keychain pedir confirmação e a captura trava). Se o usuário estiver com o
+  app aberto no Xcode, a segunda instância fica sem janela: compilar a cópia de captura com
+  `PRODUCT_BUNDLE_IDENTIFIER=br.com.drhallim.IOLCalcSnap` em `DerivedData/Snap` (ver README).
   `-iol_sample YES -iol_native_ui YES -iol_snapshot <png>` grava a janela em PNG dentro de
   `~/Library/Containers/br.com.drhallim.IOLCalc/Data/`; `-iol_snapshot_bottom YES` rola até o fim.
   `-iol_chart_snapshot <png>` renderiza só o gráfico; `-iol_toric_snapshot <png>` a seção 7;
-  `-iol_sim_snapshot <png>` a seção 6 (`-iol_sim_night YES`, `-iol_sim_astig YES`). No `ImageRenderer`
+  `-iol_sim_snapshot <png>` a seção 6 (dia e noite; `-iol_sim_astig YES` liga o astigmatismo). No `ImageRenderer`
   os controles AppKit (campos, seletores, links) saem como retângulos amarelos — é limitação da
   captura, não do app; use `-iol_snapshot` para vê-los.
   `-iol_ai_fake_file <txt>` aplica um JSON como se viesse da IA; `-iol_prep_test <imagem>` grava

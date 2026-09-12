@@ -76,7 +76,10 @@ seção 7 (planejamento tórico com diagrama arrastável), todas calculando com 
   `-iol_report_snapshot <png>` e `-iol_report_pdf <pdf>` renderizam o relatório; `-iol_cases_test <txt>`
   faz um ciclo salvar/atualizar/recarregar/apagar num JSON temporário e grava "OK" no fim;
   `-iol_no_keychain YES` pula o Keychain (um binário recém-compilado faria o sistema pedir confirmação
-  e travaria a captura).
+  e travaria a captura). Se o app já estiver aberto pelo Xcode, o macOS não abre a janela de uma
+  segunda instância: compile a cópia de captura com outro bundle id
+  (`xcodebuild … -derivedDataPath DerivedData/Snap build PRODUCT_BUNDLE_IDENTIFIER=br.com.drhallim.IOLCalcSnap`;
+  o container passa a ser `~/Library/Containers/br.com.drhallim.IOLCalcSnap/Data`).
 - `IOLCore/Toric.swift` porta o módulo tórico da web (`torState`/`toricRecalc`): astigmatismo total
   por K anterior, Abulafia-Koch, Næser-Savini ou TK medido; SIA vetorial; cilindro da LIO convertido
   ao plano corneano pela razão de toricidade (calculada pela ELP do olho com o SRK/T, senão o padrão
@@ -90,6 +93,12 @@ seção 7 (planejamento tórico com diagrama arrastável), todas calculando com 
   serializam `EyeForm`/`ToricForm` e as escolhas; a lista fica em
   `Application Support/IOLCalc/cases.json` no container do app. "Salvar caso atual", "Atualizar" (quando
   o estado veio de um caso), "Salvar como novo", abrir, renomear e apagar. "Limpar" começa um caso novo.
-- `SimulationSection` desenha os quatro quadros (celular, notebook, GPS, rua) em `Canvas`, em
-  tamanho físico real, com desfoque gaussiano pela AV binocular prevista, arrasto direcional do
-  astigmatismo, perda de contraste das difrativas e halos/anéis/starburst à noite.
+- `SimulationSection` mostra duas cenas fotográficas do banco do motorista (dia e noite), cada uma
+  com as três distâncias em camadas: a foto inteira desfocada pela AV a 75 cm (painel), o que se vê
+  pelo vidro (polígonos em `SimulationScene.farPolygons`) desfocado pela AV de longe, e a mão com o
+  celular (PNG com transparência, mensagem desenhada na tela) desfocada pela AV a 40 cm. Desfoque
+  gaussiano a 2 px/′ (a ampliação das fotos é menor que a real), arrasto do astigmatismo por média
+  aditiva de 8 cópias, perda de contraste das difrativas e, à noite, halos/anéis/starburst nas luzes
+  marcadas em `SimulationScene.night.lights`. Fotos (licença Unsplash): Tim Foster (dia), M. R.
+  (noite) e personalgraphic.com (mão); a mão foi recortada com o Vision (subject lifting). Os
+  arquivos estão em `Assets.xcassets` (`sim-day`, `sim-night`, `sim-hand`).

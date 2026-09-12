@@ -20,20 +20,31 @@ public enum VisualSimulation {
     public static let dysphotopsiaLabels = ["baixa", "baixa a moderada", "moderada", "alta"]
     public static let haloModeLabels = ["melhor caso", "quadro mais comum", "pior caso"]
 
-    /// Um quadro: distância real e o defocus equivalente.
-    public struct Tile: Sendable, Hashable, Identifiable {
+    /// Uma distância da cena fotográfica e o defocus equivalente.
+    public struct Distance: Sendable, Hashable, Identifiable {
         public let id: String
         public let label: String
         public let distanceCm: Double
         public let defocus: Double
     }
 
-    public static let tiles: [Tile] = [
-        Tile(id: "phone", label: "Celular · 40 cm", distanceCm: 40, defocus: -2.5),
-        Tile(id: "laptop", label: "Notebook · 70 cm", distanceCm: 70, defocus: -1.43),
-        Tile(id: "gps", label: "GPS do carro · 75 cm", distanceCm: 75, defocus: -1.33),
-        Tile(id: "far", label: "Rua · placa e semáforo a 50 m", distanceCm: 5000, defocus: 0),
+    /// As três camadas das cenas: celular na mão, painel do carro e a rua pelo para-brisa.
+    public static let distances: [Distance] = [
+        Distance(id: "near", label: "Celular · 40 cm", distanceCm: 40, defocus: -2.5),
+        Distance(id: "mid", label: "Painel · 75 cm", distanceCm: 75, defocus: -1.33),
+        Distance(id: "far", label: "Rua · longe", distanceCm: 5000, defocus: 0),
     ]
+
+    /// Pixels de cena por minuto de arco usados só para o desfoque das fotos (a cena tem ampliação
+    /// menor do que a real; o desfoque mantém a escala de 2 px/′ da versão anterior na tela).
+    public static let sceneBlurPixelsPerArcMinute = 2.0
+    public static let sceneWidth = 1120.0
+    public static let sceneHeight = 720.0
+
+    /// σ do desfoque (px) para uma ampliação qualquer.
+    public static func blurSigma(logMAR l: Double, pixelsPerArcMinute k: Double) -> Double {
+        min(40, max(0, 0.6 * (pow(10, max(0, l)) - 1) * k))
+    }
 
     /// σ do desfoque gaussiano (px de quadro) a partir da AV: MAR = 10^logMAR; nítido em 20/20.
     public static func blurSigma(logMAR l: Double) -> Double {

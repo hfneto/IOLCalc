@@ -62,7 +62,6 @@ enum DebugSnapshot {
             let model = CalculatorModel()
             model.fillSample()
             model.astigmatismOn = d.bool(forKey: "iol_sim_astig")
-            model.simulationNight = d.bool(forKey: "iol_sim_night")
             write(SimulationSection(model: model), to: path)
         }
     }

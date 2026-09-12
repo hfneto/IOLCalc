@@ -1,7 +1,7 @@
 import SwiftUI
 import IOLCore
 
-// MARK: - 6 · Simulação visual
+// MARK: - 6 · Simulação visual (cenas fotográficas)
 
 struct SimulationSection: View {
     @Bindable var model: CalculatorModel
@@ -9,348 +9,290 @@ struct SimulationSection: View {
     private var anyEye: Bool { model.eyeActive(.od) || model.eyeActive(.oe) }
 
     var body: some View {
-        SectionCard(title: "6 · Simulação visual", trailing: AnyView(controls)) {
-            MutedText("Cada quadro é um recorte ampliado do que o paciente vê a uma distância real, com o desfoque calculado da curva binocular resultante (lentes + residual + astigmatismo, se ligado). A ampliação é a mesma em todos os quadros: 1 minuto de arco = 2 px na tela, por isso a nitidez entre distâncias é comparável.", size: 12.5)
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 12)], spacing: 12) {
-                ForEach(VisualSimulation.tiles) { tile in
-                    tileView(tile)
-                }
-            }
+        SectionCard(title: "6 · Simulação visual") {
+            MutedText("Duas cenas reais vistas do banco do motorista, cada uma com as três distâncias: o celular na mão (40 cm), o painel (75 cm) e a rua pelo para-brisa (longe). Cada camada é desfocada pela AV binocular prevista naquela distância (lentes + residual + astigmatismo, se ligado). À noite entram a penalidade mesópica e os halos nas luzes.", size: 12.5)
+            sceneBlock(.day)
+            sceneBlock(.night)
             if anyEye {
                 let dys = model.simulationDysphotopsia()
-                if model.simulationNight {
-                    (Text("À noite a combinação escolhida tende a disfotopsia ") + Text(VisualSimulation.dysphotopsiaLabels[dys]).bold()
-                     + Text(" (classe das lentes). Use os botões para mostrar ao paciente a variação individual (\(VisualSimulation.haloModeLabels[model.simulationHaloMode])): alguns notam quase nada, a maioria nota halos ao dirigir, poucos têm queixa importante."))
-                        .font(.system(size: 12)).foregroundStyle(Theme.muted)
-                } else {
-                    (Text("Quadros diurnos. Alterne para ") + Text("Noite").bold() + Text(" para ver a penalidade mesópica e os halos/starburst nas luzes."))
-                        .font(.system(size: 12)).foregroundStyle(Theme.muted)
-                }
+                (Text("À noite a combinação escolhida tende a disfotopsia ") + Text(VisualSimulation.dysphotopsiaLabels[dys]).bold()
+                 + Text(" (classe das lentes). Use os botões da cena noturna para mostrar ao paciente a variação individual (\(VisualSimulation.haloModeLabels[model.simulationHaloMode])): alguns notam quase nada, a maioria nota halos ao dirigir, poucos têm queixa importante."))
+                    .font(.system(size: 12)).foregroundStyle(Theme.muted)
             }
-            MutedText("Calibração: a AV prevista (logMAR) no defocus de cada distância vira um desfoque gaussiano com σ = 0,6·(MAR − 1) minutos de arco (MAR = 10^logMAR). À noite soma-se +0,08 logMAR (mesópico) e, nas fontes de luz distantes, halos e starburst com intensidade pela classe da lente (difrativas = mais). As ópticas difrativas perdem ≈0,1–0,2 log de sensibilidade ao contraste, e isso entra como redução de contraste do quadro. Os tamanhos são os reais: mensagem de celular 15 pt a 40 cm, e-mail 12 pt a 70 cm, GPS a 75 cm, placa com letras de 30 cm a 50 m.", size: 11.5)
+            MutedText("Calibração: a AV prevista (logMAR) no defocus de cada distância vira um desfoque gaussiano com σ = 0,6·(MAR − 1) minutos de arco (MAR = 10^logMAR), a 2 px por minuto de arco. À noite soma-se +0,08 logMAR (mesópico); nas luzes, halos, anéis e starburst com intensidade pela classe da lente (difrativas = mais). As ópticas difrativas perdem ≈0,1–0,2 log de sensibilidade ao contraste, aplicado como redução de contraste. Fotos: Tim Foster, M. R. e personalgraphic.com (Unsplash).", size: 11.5)
         }
     }
 
-    private var controls: some View {
-        HStack(spacing: 10) {
-            Picker("", selection: $model.simulationNight) {
-                Text("☀ Dia").tag(false)
-                Text("🌙 Noite").tag(true)
-            }
-            .pickerStyle(.segmented).labelsHidden().fixedSize()
-            if model.simulationNight {
-                Picker("", selection: $model.simulationHaloMode) {
-                    Text("melhor caso").tag(0)
-                    Text("mais comum").tag(1)
-                    Text("pior caso").tag(2)
-                }
-                .pickerStyle(.segmented).labelsHidden().fixedSize()
-            }
-        }
-    }
-
-    private func tileView(_ tile: VisualSimulation.Tile) -> some View {
-        let acuity = model.simulationAcuity(tile)
+    private func sceneBlock(_ scene: SimulationScene) -> some View {
+        let acuities = VisualSimulation.distances.map { model.simulationAcuity($0, night: scene.night) }
         return VStack(spacing: 0) {
-            HStack {
-                Text(tile.label).font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.ink)
-                Spacer()
-                Text(acuity.map { DefocusModel.snellen(fromLogMAR: $0) } ?? "—")
-                    .font(.system(size: 13, weight: .heavy))
-                    .foregroundStyle(acuity.map { $0 <= 0.2 ? ToricDiagram.green : ($0 <= 0.4 ? Theme.warn : Theme.od) } ?? Theme.muted)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) { header(scene, acuities); Spacer(minLength: 0); if scene.night { haloPicker } }
+                VStack(alignment: .leading, spacing: 6) { header(scene, acuities); if scene.night { haloPicker } }
             }
-            .padding(.horizontal, 10).padding(.vertical, 6)
+            .padding(.horizontal, 10).padding(.vertical, 7)
             .background(Theme.soft)
-            SimulationTile(tile: tile, acuity: acuity, night: model.simulationNight, haloMode: model.simulationHaloMode,
-                           dysphotopsia: model.simulationDysphotopsia(), astigmatism: model.simulationAstigmatism())
-                .aspectRatio(VisualSimulation.tileWidth / VisualSimulation.tileHeight, contentMode: .fit)
+            SimulationSceneView(scene: scene, acuities: acuities, haloMode: model.simulationHaloMode,
+                                dysphotopsia: model.simulationDysphotopsia(), astigmatism: model.simulationAstigmatism())
+                .aspectRatio(VisualSimulation.sceneWidth / VisualSimulation.sceneHeight, contentMode: .fit)
                 .clipped()
         }
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.line))
     }
-}
 
-/// Um quadro da simulação: conteúdo nítido em tamanho físico, desfocado pela AV prevista,
-/// arrastado pelo astigmatismo, com contraste reduzido e halos à noite. Porte do `renderTiles`.
-struct SimulationTile: View {
-    let tile: VisualSimulation.Tile
-    /// AV (logMAR) do quadro; `nil` sem olho ativo (mostra o aviso).
-    let acuity: Double?
-    let night: Bool
-    let haloMode: Int
-    let dysphotopsia: Int
-    let astigmatism: (cylinder: Double, axis: Double)?
-
-    private typealias Light = TileScene.Light
-
-    var body: some View {
-        Canvas(rendersAsynchronously: false) { ctx, size in
-            render(&ctx, size: size)
-        }
-    }
-
-    private func render(_ ctx: inout GraphicsContext, size: CGSize) {
-        let W = VisualSimulation.tileWidth, H = VisualSimulation.tileHeight
-        let s = size.width / W
-        let font = SimulationFont.self
-        ctx.clip(to: Path(CGRect(origin: .zero, size: size))) // halos e nuvens não vazam do quadro
-        guard let acuity else {
-            var c = ctx
-            c.scaleBy(x: s, y: s)
-            c.fill(Path(CGRect(x: 0, y: 0, width: W, height: H)), with: .color(night ? Color(hex: 0x111827) : Color(hex: 0xe2e8f0)))
-            c.draw(c.resolve(Text("Selecione a LIO (seção 2)").font(font.system(44, weight: .semibold)).foregroundColor(night ? Color(hex: 0x9ca3af) : Color(hex: 0x64748b))),
-                   at: CGPoint(x: W / 2, y: H / 2), anchor: .center)
-            return
-        }
-        let sigma = VisualSimulation.blurSigma(logMAR: acuity)
-        let scene = TileScene(tile: tile, night: night)
-        let blur: Double = sigma > 0.3 ? sigma * s : 0
-
-        // conteúdo nítido → gaussiano (σ pela AV) → arrasto direcional (astigmatismo)
-        let smear = astigmatism.map { VisualSimulation.directionalBlur(cylinder: $0.cylinder) } ?? 0
-        if let astigmatism, astigmatism.cylinder > 0.1, smear >= 0.5 {
-            let n = 12
-            let rad = astigmatism.axis * .pi / 180
-            let dx = cos(rad), dy = -sin(rad)
-            for i in 0..<n {
-                let t = (Double(i) / Double(n - 1) - 0.5) * 2 * smear
-                ctx.drawLayer { layer in
-                    layer.opacity = 1 / Double(n)
-                    layer.translateBy(x: dx * t * s, y: dy * t * s)
-                    if blur > 0 { layer.addFilter(.blur(radius: blur)) }
-                    layer.scaleBy(x: s, y: s)
-                    _ = scene.draw(&layer)
-                }
-            }
-        } else {
-            ctx.drawLayer { layer in
-                if blur > 0 { layer.addFilter(.blur(radius: blur)) }
-                layer.scaleBy(x: s, y: s)
-                _ = scene.draw(&layer)
-            }
-        }
-
-        // perda de contraste das ópticas difrativas
-        let cf = VisualSimulation.contrast(dysphotopsia: dysphotopsia, night: night)
-        if cf < 1 {
-            ctx.fill(Path(CGRect(origin: .zero, size: size)), with: .color(Color(red: 0.5, green: 0.5, blue: 0.5).opacity(1 - cf)))
-        }
-
-        if night {
-            let lights = scene.lights
-            if !lights.isEmpty { drawHalos(&ctx, lights: lights, scale: s) }
-        }
-    }
-
-    /// Halos, anéis difrativos e starburst nas fontes de luz (`drawHalos` da web).
-    private func drawHalos(_ ctx: inout GraphicsContext, lights: [Light], scale s: Double) {
-        let I = VisualSimulation.haloIntensity(dysphotopsia: dysphotopsia, mode: haloMode)
-        guard I >= 0.02 else { return }
-        let pxa = VisualSimulation.pixelsPerArcMinute
-        for (idx, L) in lights.enumerated() {
-            let col = L.color, sz = min(L.strength, 1.35)
-            let outer = L.radius + 40 + 120 * I * sz
-            var c = ctx
-            c.scaleBy(x: s, y: s)
-            let center = CGPoint(x: L.x, y: L.y)
-            c.fill(Path(ellipseIn: CGRect(x: L.x - outer, y: L.y - outer, width: 2 * outer, height: 2 * outer)),
-                   with: .radialGradient(Gradient(colors: [col.opacity(min(0.5, 0.22 * I * sz)), col.opacity(0)]), center: center, startRadius: L.radius, endRadius: outer))
-            guard dysphotopsia >= 1 else { continue }
-            // anéis difrativos (raio angular ≈ 0,4–0,65°)
-            let rings: [Double] = dysphotopsia >= 3 ? [24 * pxa, 39 * pxa] : [30 * pxa]
-            for R in rings {
-                let a = min(0.55, (dysphotopsia >= 3 ? 0.22 : 0.13) * I * sz)
-                let rr = R * (1 + 0.08 * I)
-                ctx.drawLayer { layer in
-                    layer.addFilter(.blur(radius: 6 * s))
-                    layer.scaleBy(x: s, y: s)
-                    layer.stroke(Path(ellipseIn: CGRect(x: L.x - rr, y: L.y - rr, width: 2 * rr, height: 2 * rr)), with: .color(col.opacity(a)), lineWidth: 5 * pxa / 2)
-                }
-            }
-            // starburst
-            let n = 16
-            let base = (10 + 35 * I * sz) * pxa / 2
-            let phase = (Double(idx) * 2.399).truncatingRemainder(dividingBy: 6.283)
-            ctx.drawLayer { layer in
-                layer.addFilter(.blur(radius: 1.5 * s))
-                layer.scaleBy(x: s, y: s)
-                for k in 0..<n {
-                    let ang = Double(k) * .pi * 2 / Double(n) + phase
-                    let len = base * (0.6 + 0.55 * abs(sin(Double(k) * 1.7 + Double(idx))))
-                    let end = CGPoint(x: L.x + cos(ang) * len, y: L.y + sin(ang) * len)
-                    var p = Path()
-                    p.move(to: center)
-                    p.addLine(to: end)
-                    layer.stroke(p, with: .linearGradient(Gradient(colors: [col.opacity(min(0.6, 0.35 * I * sz)), col.opacity(0)]), startPoint: center, endPoint: end), lineWidth: 2.2)
+    private func header(_ scene: SimulationScene, _ acuities: [Double?]) -> some View {
+        HStack(spacing: 10) {
+            Text(scene.night ? "🌙 Noite" : "☀ Dia").font(.system(size: 12.5, weight: .bold)).foregroundStyle(Theme.ink)
+            ForEach(Array(VisualSimulation.distances.enumerated()), id: \.offset) { i, d in
+                HStack(spacing: 4) {
+                    Text(d.label).font(.system(size: 11.5)).foregroundStyle(Theme.muted)
+                    Text(acuities[i].map { DefocusModel.snellen(fromLogMAR: $0) } ?? "—")
+                        .font(.system(size: 12.5, weight: .heavy))
+                        .foregroundStyle(acuities[i].map { $0 <= 0.2 ? ToricDiagram.green : ($0 <= 0.4 ? Theme.warn : Theme.od) } ?? Theme.muted)
                 }
             }
         }
+        .fixedSize()
+    }
+
+    private var haloPicker: some View {
+        Picker("", selection: $model.simulationHaloMode) {
+            Text("melhor caso").tag(0)
+            Text("mais comum").tag(1)
+            Text("pior caso").tag(2)
+        }
+        .pickerStyle(.segmented).labelsHidden().fixedSize()
     }
 }
 
-/// Fonte dos quadros (sistema, como o `-apple-system` da web).
-enum SimulationFont {
-    static func system(_ size: Double, weight: Font.Weight = .regular) -> Font {
-        .system(size: size.rounded(), weight: weight)
-    }
-}
+// MARK: - Cena
 
-/// Conteúdo nítido de cada quadro, em px de quadro (1120 × 720), tamanhos físicos reais.
-/// `draw` devolve as fontes de luz (para os halos noturnos).
-struct TileScene {
+/// Uma cena fotográfica: foto do banco do motorista (painel a ≈75 cm), polígonos do que se vê pelo
+/// vidro (longe) e as fontes de luz para os halos noturnos. Coordenadas normalizadas (0–1, y para
+/// baixo) sobre a foto 14:9, que é desenhada esticada no quadro de 1120 × 720.
+struct SimulationScene {
     struct Light {
         let x: Double, y: Double, radius: Double, strength: Double
         let color: Color
     }
 
-    let tile: VisualSimulation.Tile
+    let imageName: String
     let night: Bool
+    let farPolygons: [[CGPoint]]
+    let lights: [Light]
 
-    private let W = VisualSimulation.tileWidth
-    private let H = VisualSimulation.tileHeight
-    private var cm: Double { tile.distanceCm }
+    static let day = SimulationScene(
+        imageName: "sim-day", night: false,
+        farPolygons: [
+            [(0.16, 0.0), (0.76, 0.0), (0.83, 0.20), (0.86, 0.27), (1.0, 0.31), (1.0, 0.56), (0.72, 0.585), (0.55, 0.59), (0.31, 0.60),
+             (0.27, 0.50), (0.21, 0.30), (0.21, 0.12)].map { CGPoint(x: $0.0, y: $0.1) },
+            [(0.0, 0.42), (0.06, 0.36), (0.13, 0.40), (0.13, 0.53), (0.0, 0.56)].map { CGPoint(x: $0.0, y: $0.1) },
+        ],
+        lights: [])
 
-    private func px(_ mm: Double) -> Double { VisualSimulation.pixels(forMillimetres: mm, at: cm) }
+    static let night = SimulationScene(
+        imageName: "sim-night", night: true,
+        farPolygons: [
+            [(0.13, 0.0), (1.0, 0.0), (1.0, 0.53), (0.78, 0.56), (0.55, 0.53), (0.30, 0.51), (0.20, 0.47), (0.13, 0.42)].map { CGPoint(x: $0.0, y: $0.1) },
+        ],
+        lights: [
+            Light(x: 0.473, y: 0.260, radius: 0.012, strength: 0.9, color: Color(red: 1, green: 0.85, blue: 0.55)),
+            Light(x: 0.540, y: 0.300, radius: 0.006, strength: 0.8, color: Color(red: 1, green: 0.95, blue: 0.8)),
+            Light(x: 0.575, y: 0.292, radius: 0.006, strength: 0.8, color: Color(red: 1, green: 0.95, blue: 0.8)),
+            Light(x: 0.688, y: 0.343, radius: 0.005, strength: 0.9, color: Color(red: 1, green: 0.3, blue: 0.25)),
+            Light(x: 0.704, y: 0.343, radius: 0.005, strength: 0.9, color: Color(red: 1, green: 0.3, blue: 0.25)),
+        ])
 
-    /// Luzes do quadro (só a cena distante tem).
-    var lights: [Light] { tile.id == "far" ? farLights : [] }
+    /// Caminho dos polígonos "longe" em px de cena.
+    func farPath(width W: Double, height H: Double) -> Path {
+        var p = Path()
+        for poly in farPolygons {
+            guard let f = poly.first else { continue }
+            p.move(to: CGPoint(x: f.x * W, y: f.y * H))
+            for pt in poly.dropFirst() { p.addLine(to: CGPoint(x: pt.x * W, y: pt.y * H)) }
+            p.closeSubpath()
+        }
+        return p
+    }
+}
 
-    @discardableResult
-    func draw(_ c: inout GraphicsContext) -> [Light] {
-        switch tile.id {
-        case "phone": drawPhone(&c); return []
-        case "laptop": drawLaptop(&c); return []
-        case "gps": drawGPS(&c); return []
-        default: drawFar(&c); return farLights
+/// Desenha uma cena com as três camadas desfocadas, o celular com a mensagem, contraste, brilho e
+/// halos noturnos e o arrasto do astigmatismo.
+struct SimulationSceneView: View {
+    let scene: SimulationScene
+    /// AV (logMAR) nas distâncias de `VisualSimulation.distances` (perto, painel, longe); `nil` sem olho ativo.
+    let acuities: [Double?]
+    let haloMode: Int
+    let dysphotopsia: Int
+    let astigmatism: (cylinder: Double, axis: Double)?
+
+    private let W = VisualSimulation.sceneWidth
+    private let H = VisualSimulation.sceneHeight
+    /// Onde a mão com o celular entra (px de cena) — a foto tem 900 × 1240.
+    private let phoneRect = CGRect(x: 745, y: 292, width: 345, height: 475)
+    /// Tela do celular, normalizada à foto da mão (com cantos arredondados).
+    private let screenRect = CGRect(x: 0.37, y: 0.09, width: 0.55, height: 0.845)
+
+    var body: some View {
+        Canvas(rendersAsynchronously: true) { ctx, size in
+            render(&ctx, size: size)
         }
     }
 
-    private func rr(_ x: Double, _ y: Double, _ w: Double, _ h: Double, _ r: Double) -> Path {
-        Path(roundedRect: CGRect(x: x, y: y, width: w, height: h), cornerRadius: r)
-    }
-
-    private func text(_ c: GraphicsContext, _ s: String, _ size: Double, _ color: Color, weight: Font.Weight = .regular) -> GraphicsContext.ResolvedText {
-        c.resolve(Text(s).font(SimulationFont.system(size, weight: weight)).foregroundColor(color))
-    }
-
-    // Celular a 40 cm: mensagem de 15 pt (≈5,3 mm)
-    private func drawPhone(_ c: inout GraphicsContext) {
-        c.fill(Path(CGRect(x: 0, y: 0, width: W, height: H)), with: .color(night ? Color(hex: 0x0b141a) : Color(hex: 0xe5ddd5)))
-        let fs = px(5.3)
-        let lines = ["Quinta, 8h30", "Dr. Hallim ✓"]
-        let ink = night ? Color(hex: 0xe9edef) : Color(hex: 0x111b21)
-        let resolved = lines.map { text(c, $0, fs, ink) }
-        let w = (resolved.map { $0.measure(in: CGSize(width: 10_000, height: 10_000)).width }.max() ?? 0) + fs * 0.9
-        let ts = px(3.5)
-        let lh = fs * 1.22, h = lh * Double(lines.count) + fs * 0.8 + ts * 0.9 // + linha do horário
-        let x = (W - w) / 2, y = (H - h) / 2
-        c.fill(rr(x, y, w, h, fs * 0.35), with: .color(night ? Color(hex: 0x1f2c34) : .white))
-        for (i, t) in resolved.enumerated() {
-            c.draw(t, at: CGPoint(x: x + fs * 0.45, y: y + fs * 0.5 + lh * Double(i + 1) - lh * 0.22), anchor: .bottomLeading)
+    private func render(_ ctx: inout GraphicsContext, size: CGSize) {
+        let s = size.width / W
+        ctx.clip(to: Path(CGRect(origin: .zero, size: size)))
+        let photo = ctx.resolve(Image(scene.imageName))
+        let hand = ctx.resolve(Image("sim-hand"))
+        guard acuities.count == 3, let near = acuities[0], let mid = acuities[1], let far = acuities[2] else {
+            // sem olho ativo: cena nítida, apagada, com aviso
+            ctx.drawLayer { l in l.scaleBy(x: s, y: s); l.draw(photo, in: CGRect(x: 0, y: 0, width: W, height: H)) }
+            ctx.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.black.opacity(0.55)))
+            ctx.draw(ctx.resolve(Text("Selecione a LIO (seção 2)").font(.system(size: 44 * s, weight: .semibold)).foregroundColor(.white)),
+                     at: CGPoint(x: size.width / 2, y: size.height / 2), anchor: .center)
+            return
         }
-        c.draw(text(c, "08:12", ts, night ? Color(hex: 0x8696a0) : Color(hex: 0x667781)), at: CGPoint(x: x + w - ts * 0.5, y: y + h - ts * 0.35), anchor: .bottomTrailing)
-    }
+        let k = VisualSimulation.sceneBlurPixelsPerArcMinute
+        let sigma = (near: VisualSimulation.blurSigma(logMAR: near, pixelsPerArcMinute: k) * s,
+                     mid: VisualSimulation.blurSigma(logMAR: mid, pixelsPerArcMinute: k) * s,
+                     far: VisualSimulation.blurSigma(logMAR: far, pixelsPerArcMinute: k) * s)
 
-    // Notebook a 70 cm: e-mail de 12 pt (≈4,2 mm)
-    private func drawLaptop(_ c: inout GraphicsContext) {
-        c.fill(Path(CGRect(x: 0, y: 0, width: W, height: H)), with: .color(night ? Color(hex: 0x1e1e1e) : .white))
-        let fs = px(4.2)
-        let ink = night ? Color(hex: 0xd4d4d4) : Color(hex: 0x1f2937)
-        let lines = ["Prezada Maria,", "confirmamos a sua", "cirurgia para quinta,", "dia 24, às 7h. Chegar", "em jejum de 8 horas."]
-        let lh = fs * 1.45, y0 = (H - lh * Double(lines.count)) / 2 + fs
-        for (i, l) in lines.enumerated() {
-            c.draw(text(c, l, fs, ink), at: CGPoint(x: fs * 1.2, y: y0 + lh * Double(i)), anchor: .bottomLeading)
-        }
-    }
-
-    // GPS a 75 cm
-    private func drawGPS(_ c: inout GraphicsContext) {
-        c.fill(Path(CGRect(x: 0, y: 0, width: W, height: H)), with: .color(night ? Color(hex: 0x111827) : Color(hex: 0xe8ecef)))
-        var road = Path()
-        road.move(to: CGPoint(x: W * 0.62, y: H)); road.addLine(to: CGPoint(x: W * 0.62, y: H * 0.42)); road.addLine(to: CGPoint(x: W * 0.15, y: H * 0.42))
-        c.stroke(road, with: .color(night ? Color(hex: 0x374151) : .white), lineWidth: px(9))
-        var minor = Path()
-        minor.move(to: CGPoint(x: 0, y: H * 0.75)); minor.addLine(to: CGPoint(x: W, y: H * 0.75))
-        minor.move(to: CGPoint(x: W * 0.3, y: 0)); minor.addLine(to: CGPoint(x: W * 0.3, y: H * 0.42))
-        c.stroke(minor, with: .color(night ? Color(hex: 0x4b5563) : Color(hex: 0xd1d5db)), lineWidth: px(4))
-        c.stroke(road, with: .color(Color(hex: 0x2563eb)), style: StrokeStyle(lineWidth: px(5), lineCap: .round, lineJoin: .round))
-        // painel de instrução
-        let bh = px(22), bw = W * 0.56
-        c.fill(rr(0, 0, bw, bh, px(3)), with: .color(night ? Color(hex: 0x064e3b) : Color(hex: 0x15803d)))
-        let fs = px(7), fs2 = px(4)
-        let ax = px(2) + fs * 0.2, ay = bh / 2
-        var arrow = Path()
-        arrow.move(to: CGPoint(x: ax + fs * 0.75, y: ay + fs * 0.55)); arrow.addLine(to: CGPoint(x: ax + fs * 0.75, y: ay - fs * 0.15)); arrow.addLine(to: CGPoint(x: ax + fs * 0.1, y: ay - fs * 0.15))
-        arrow.move(to: CGPoint(x: ax + fs * 0.42, y: ay - fs * 0.5)); arrow.addLine(to: CGPoint(x: ax + fs * 0.05, y: ay - fs * 0.15)); arrow.addLine(to: CGPoint(x: ax + fs * 0.42, y: ay + fs * 0.2))
-        c.stroke(arrow, with: .color(.white), style: StrokeStyle(lineWidth: fs * 0.16, lineCap: .round, lineJoin: .round))
-        c.draw(text(c, "300 m", fs, .white, weight: .bold), at: CGPoint(x: ax + fs * 1.1, y: ay - fs * 0.22), anchor: .leading)
-        c.draw(text(c, "Av. Paulista", fs2, .white), at: CGPoint(x: ax + fs * 1.1, y: ay + fs * 0.5), anchor: .leading)
-        let s2 = px(5)
-        c.draw(text(c, "12 min · 4,8 km", s2, night ? Color(hex: 0xe5e7eb) : Color(hex: 0x111827), weight: .bold), at: CGPoint(x: W - s2 * 0.6, y: H - s2 * 0.9), anchor: .bottomTrailing)
-    }
-
-    // Rua a 50 m: placa 2,0 × 1,0 m com letras de 30 cm, semáforo, carro à frente
-    private var signFrame: (x: Double, y: Double, w: Double, h: Double) {
-        (W - px(1600) - px(120), H * 0.1, px(1600), px(900))
-    }
-
-    private var farLights: [Light] {
-        var lights: [Light] = []
-        let sx = W * 0.035, sy = H * 0.08, sw = px(450), sh = px(1250), r = px(150)
-        lights.append(Light(x: sx + sw / 2, y: sy + sh * 0.2, radius: r, strength: 1.0, color: Color(red: 1, green: 70 / 255, blue: 70 / 255)))
-        let cw = px(1500), ch = px(1200), cx = W * 0.36 - cw / 2, cy = H * 0.66 - ch * 0.95
-        if night {
-            for lx in [cx + cw * 0.14, cx + cw * 0.86] {
-                lights.append(Light(x: lx, y: cy + ch * 0.4, radius: px(150), strength: 0.9, color: Color(red: 1, green: 60 / 255, blue: 50 / 255)))
-            }
-            for (lx, ly) in [(W * 0.86, H * 0.08), (W * 0.97, H * 0.26)] {
-                lights.append(Light(x: lx, y: ly, radius: px(400), strength: 1.2, color: Color(red: 1, green: 244 / 255, blue: 210 / 255)))
-            }
-        }
-        return lights
-    }
-
-    private func drawFar(_ c: inout GraphicsContext) {
-        let skyColors = night ? [Color(hex: 0x020617), Color(hex: 0x111a2e)] : [Color(hex: 0x7fb3e6), Color(hex: 0xd6ebfa)]
-        c.fill(Path(CGRect(x: 0, y: 0, width: W, height: H)), with: .linearGradient(Gradient(colors: skyColors), startPoint: .zero, endPoint: CGPoint(x: 0, y: H * 0.66)))
-        c.fill(Path(CGRect(x: 0, y: H * 0.66, width: W, height: H)), with: .color(night ? Color(hex: 0x1f2937) : Color(hex: 0x6b7280)))
-        var lane = Path()
-        lane.move(to: CGPoint(x: W * 0.66, y: H * 0.66)); lane.addLine(to: CGPoint(x: W * 0.66, y: H))
-        c.stroke(lane, with: .color(night ? Color(hex: 0x9ca3af) : Color(hex: 0xf3f4f6)), style: StrokeStyle(lineWidth: px(120), dash: [px(1500), px(1500)]))
-        // placa
-        let lt = px(250)
-        let (sx0, sy0, pw, ph) = signFrame
-        c.fill(rr(sx0, sy0, pw, ph, px(60)), with: .color(night ? Color(hex: 0x0f5132) : Color(hex: 0x15803d)))
-        c.stroke(rr(sx0, sy0, pw, ph, px(60)), with: .color(.white), lineWidth: px(40))
-        c.draw(text(c, "SAÍDA 12", lt, .white, weight: .bold), at: CGPoint(x: sx0 + pw / 2, y: sy0 + ph * 0.34), anchor: .center)
-        c.draw(text(c, "Centro  →", lt * 0.78, .white), at: CGPoint(x: sx0 + pw / 2, y: sy0 + ph * 0.72), anchor: .center)
-        let post = night ? Color(hex: 0x374151) : Color(hex: 0x4b5563)
-        c.fill(Path(CGRect(x: sx0 + pw / 2 - px(60), y: sy0 + ph, width: px(120), height: H * 0.66 - sy0 - ph)), with: .color(post))
-        // semáforo
-        let sx = W * 0.035, sy = H * 0.08, sw = px(450), sh = px(1250), r = px(150)
-        c.fill(rr(sx, sy, sw, sh, px(80)), with: .color(Color(hex: 0x111827)))
-        for (i, col) in [Color(hex: 0xef4444), Color(hex: 0xf59e0b), Color(hex: 0x22c55e)].enumerated() {
-            let cy = sy + sh * (0.2 + 0.3 * Double(i))
-            c.fill(Path(ellipseIn: CGRect(x: sx + sw / 2 - r, y: cy - r, width: 2 * r, height: 2 * r)), with: .color(i == 0 ? col : (night ? Color(hex: 0x1f2937) : Color(hex: 0x374151))))
-        }
-        c.fill(Path(CGRect(x: sx + sw / 2 - px(60), y: sy + sh, width: px(120), height: H * 0.66 - sy - sh)), with: .color(post))
-        // carro à frente
-        let cw = px(1500), ch = px(1200), cx = W * 0.36 - cw / 2, cy = H * 0.66 - ch * 0.95
-        c.fill(rr(cx + cw * 0.12, cy - ch * 0.4, cw * 0.76, ch * 0.5, px(150)), with: .color(night ? Color(hex: 0x0f172a) : Color(hex: 0x1e293b)))
-        c.fill(rr(cx, cy, cw, ch, px(200)), with: .color(night ? Color(hex: 0x111827) : Color(hex: 0x334155)))
-        for lx in [cx + cw * 0.14, cx + cw * 0.86] {
-            let lr = px(150), ly = cy + ch * 0.4
-            c.fill(Path(ellipseIn: CGRect(x: lx - lr * 1.4, y: ly - lr, width: lr * 2.8, height: lr * 2)), with: .color(night ? Color(hex: 0xff3b30) : Color(hex: 0xb91c1c)))
-        }
-        if night {
-            for (lx, ly) in [(W * 0.86, H * 0.08), (W * 0.97, H * 0.26)] {
-                let lr = px(400)
-                c.fill(Path(ellipseIn: CGRect(x: lx - lr, y: ly - lr, width: 2 * lr, height: 2 * lr)), with: .color(Color(hex: 0xfff7d6)))
+        // arrasto direcional do astigmatismo: várias cópias deslocadas ao longo do eixo
+        // arrasto na ampliação da cena: 1 D ≈ 5′ de arco (metade da regra dos quadros antigos, para
+        // ficar proporcional ao desfoque gaussiano da penalidade de AV do cilindro)
+        let smear = (astigmatism.map { VisualSimulation.directionalBlur(cylinder: $0.cylinder) } ?? 0) * (k / VisualSimulation.pixelsPerArcMinute) * 0.5
+        if let astigmatism, astigmatism.cylinder > 0.1, smear >= 0.5 {
+            // média exata das cópias: soma aditiva (1/n cada) sobre preto — com "over" a cobertura
+            // ficaria em 1 − (1 − 1/n)^n ≈ 66 % e o fundo branco vazaria como uma névoa.
+            let n = 8
+            let rad = astigmatism.axis * .pi / 180
+            let dx = cos(rad), dy = -sin(rad)
+            ctx.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.black))
+            var acc = ctx
+            acc.blendMode = .plusLighter   // vale para a composição de cada cópia no acumulador…
+            acc.opacity = 1 / Double(n)
+            for i in 0..<n {
+                let t = (Double(i) / Double(n - 1) - 0.5) * 2 * smear
+                acc.drawLayer { l in
+                    l.blendMode = .normal       // …mas dentro da cópia o celular cobre o painel normalmente
+                    l.opacity = 1
+                    l.translateBy(x: dx * t * s, y: dy * t * s)
+                    composite(&l, s: s, photo: photo, hand: hand, sigma: sigma)
+                }
             }
         } else {
-            for (x, y, r2) in [(W * 0.3, H * 0.05, px(700)), (W * 0.55, H * 0.04, px(500))] {
-                c.fill(Path(ellipseIn: CGRect(x: x - r2, y: y - r2 * 0.4, width: 2 * r2, height: r2 * 0.8)), with: .color(Color.white.opacity(0.7)))
+            composite(&ctx, s: s, photo: photo, hand: hand, sigma: sigma)
+        }
+
+        // perda de contraste das ópticas difrativas
+        let cf = VisualSimulation.contrast(dysphotopsia: dysphotopsia, night: scene.night)
+        if cf < 1 {
+            ctx.fill(Path(CGRect(origin: .zero, size: size)), with: .color(Color(red: 0.5, green: 0.5, blue: 0.5).opacity(1 - cf)))
+        }
+        if scene.night { drawNightLights(&ctx, s: s) }
+    }
+
+    /// Painel (foto inteira) desfocado a 75 cm → vidro (polígonos) desfocado ao longe → celular a 40 cm.
+    private func composite(_ ctx: inout GraphicsContext, s: Double, photo: GraphicsContext.ResolvedImage, hand: GraphicsContext.ResolvedImage,
+                           sigma: (near: Double, mid: Double, far: Double)) {
+        let full = CGRect(x: 0, y: 0, width: W, height: H)
+        ctx.drawLayer { l in
+            if sigma.mid > 0.3 { l.addFilter(.blur(radius: sigma.mid)) }
+            l.scaleBy(x: s, y: s)
+            l.draw(photo, in: full)
+        }
+        var farCtx = ctx
+        farCtx.clip(to: scene.farPath(width: W * s, height: H * s))
+        farCtx.drawLayer { l in
+            if sigma.far > 0.3 { l.addFilter(.blur(radius: sigma.far)) }
+            l.scaleBy(x: s, y: s)
+            l.draw(photo, in: full)
+        }
+        ctx.drawLayer { l in
+            if sigma.near > 0.3 { l.addFilter(.blur(radius: sigma.near)) }
+            l.scaleBy(x: s, y: s)
+            l.draw(hand, in: phoneRect)
+            drawPhoneScreen(&l)
+        }
+    }
+
+    /// Conversa de mensagens na tela do celular (texto de 15 pt a 40 cm ≈ 8 % da largura da tela).
+    private func drawPhoneScreen(_ c: inout GraphicsContext) {
+        let r = CGRect(x: phoneRect.minX + screenRect.minX * phoneRect.width, y: phoneRect.minY + screenRect.minY * phoneRect.height,
+                       width: screenRect.width * phoneRect.width, height: screenRect.height * phoneRect.height)
+        let night = scene.night
+        c.clip(to: Path(roundedRect: r, cornerRadius: r.width * 0.11))
+        c.fill(Path(r), with: .color(night ? Color(hex: 0x0b141a) : Color(hex: 0xe5ddd5)))
+        let fs = r.width * 0.083
+        // barra do contato
+        let bar = CGRect(x: r.minX, y: r.minY, width: r.width, height: fs * 2.6)
+        c.fill(Path(bar), with: .color(night ? Color(hex: 0x1f2c34) : Color(hex: 0x075e54)))
+        let av = CGRect(x: r.minX + fs * 0.6, y: bar.minY + fs * 1.15, width: fs * 1.15, height: fs * 1.15)
+        c.fill(Path(ellipseIn: av), with: .color(Color(hex: 0x94a3b8)))
+        c.draw(c.resolve(Text("Dr. Hallim").font(.system(size: fs * 0.9, weight: .semibold)).foregroundColor(.white)),
+               at: CGPoint(x: av.maxX + fs * 0.5, y: av.midY), anchor: .leading)
+        // balões
+        func bubble(_ lines: [String], y: Double, mine: Bool) -> Double {
+            let texts = lines.map { c.resolve(Text($0).font(.system(size: fs)).foregroundColor(night ? Color(hex: 0xe9edef) : Color(hex: 0x111b21))) }
+            let w = (texts.map { $0.measure(in: CGSize(width: 10_000, height: 10_000)).width }.max() ?? 0) + fs * 1.2
+            let lh = fs * 1.3, h = lh * Double(lines.count) + fs * 0.9
+            let x = mine ? r.maxX - fs * 0.5 - w : r.minX + fs * 0.5
+            let bg: Color = mine ? (night ? Color(hex: 0x005c4b) : Color(hex: 0xdcf8c6)) : (night ? Color(hex: 0x202c33) : .white)
+            c.fill(Path(roundedRect: CGRect(x: x, y: y, width: w, height: h), cornerRadius: fs * 0.5), with: .color(bg))
+            for (i, t) in texts.enumerated() { c.draw(t, at: CGPoint(x: x + fs * 0.6, y: y + fs * 0.45 + lh * Double(i)), anchor: .topLeading) }
+            return y + h + fs * 0.6
+        }
+        var y = bar.maxY + fs * 0.8
+        y = bubble(["Bom dia! Sua cirurgia", "ficou para quinta, 8h30."], y: y, mine: false)
+        y = bubble(["Chegar em jejum", "de 8 horas."], y: y, mine: false)
+        y = bubble(["Combinado, obrigada!"], y: y, mine: true)
+        _ = y
+        c.draw(c.resolve(Text("08:12").font(.system(size: fs * 0.7)).foregroundColor(night ? Color(hex: 0x8696a0) : Color(hex: 0x667781))),
+               at: CGPoint(x: r.maxX - fs * 0.6, y: r.maxY - fs * 0.5), anchor: .bottomTrailing)
+    }
+
+    /// Halo, anéis difrativos e starburst nas luzes conhecidas da cena.
+    private func drawNightLights(_ ctx: inout GraphicsContext, s: Double) {
+        let I = VisualSimulation.haloIntensity(dysphotopsia: dysphotopsia, mode: haloMode)
+        guard I >= 0.02 else { return }
+        // anéis (≈0,4–0,65° de raio) e starburst na ampliação da cena: bem menores que nos quadros antigos
+        let pxa = 0.8
+        for (idx, L) in scene.lights.enumerated() {
+            let cx = L.x * W, cy = L.y * H, r = L.radius * W
+            let col = L.color, sz = min(L.strength, 1.35)
+            let outer = r + 14 + 40 * I * sz
+            var c = ctx
+            c.scaleBy(x: s, y: s)
+            let center = CGPoint(x: cx, y: cy)
+            c.fill(Path(ellipseIn: CGRect(x: cx - outer, y: cy - outer, width: 2 * outer, height: 2 * outer)),
+                   with: .radialGradient(Gradient(colors: [col.opacity(min(0.55, 0.3 * I * sz)), col.opacity(0)]), center: center, startRadius: r, endRadius: outer))
+            guard dysphotopsia >= 1 else { continue }
+            let rings: [Double] = dysphotopsia >= 3 ? [24 * pxa, 39 * pxa] : [30 * pxa]
+            for R in rings {
+                let a = min(0.55, (dysphotopsia >= 3 ? 0.22 : 0.13) * I * sz)
+                let rr = R * (1 + 0.08 * I)
+                ctx.drawLayer { l in
+                    l.addFilter(.blur(radius: 3 * s))
+                    l.scaleBy(x: s, y: s)
+                    l.stroke(Path(ellipseIn: CGRect(x: cx - rr, y: cy - rr, width: 2 * rr, height: 2 * rr)), with: .color(col.opacity(a)), lineWidth: 2.5)
+                }
+            }
+            let n = 16
+            let base = (10 + 35 * I * sz) * pxa * 0.6
+            let phase = (Double(idx) * 2.399).truncatingRemainder(dividingBy: 6.283)
+            ctx.drawLayer { l in
+                l.addFilter(.blur(radius: 1.0 * s))
+                l.scaleBy(x: s, y: s)
+                for k in 0..<n {
+                    let ang = Double(k) * .pi * 2 / Double(n) + phase
+                    let len = base * (0.6 + 0.55 * abs(sin(Double(k) * 1.7 + Double(idx))))
+                    let end = CGPoint(x: cx + cos(ang) * len, y: cy + sin(ang) * len)
+                    var p = Path()
+                    p.move(to: center)
+                    p.addLine(to: end)
+                    l.stroke(p, with: .linearGradient(Gradient(colors: [col.opacity(min(0.6, 0.35 * I * sz)), col.opacity(0)]), startPoint: center, endPoint: end), lineWidth: 1.6)
+                }
             }
         }
     }

@@ -14,6 +14,16 @@ struct ReportView: View {
     private let ink = Theme.ink
     private let blue = Color(hex: 0x1e40af)
 
+    /// Olhos que entram no relatório: os que têm LIO escolhida e cálculo ligado. Sem nenhum, os dois
+    /// (o relatório sai só com a biometria).
+    private var eyes: [Eye] {
+        let active = Eye.allCases.filter { model.eyeActive($0) }
+        return active.isEmpty ? Eye.allCases : active
+    }
+
+    /// Olhos com LIO tórica planejada (cilindro > 0); sem nenhum, a seção tórica não aparece.
+    private var toricEyes: [Eye] { eyes.filter { model.toricPlan($0).input.iolCylinder > 0 } }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Relatório de Planejamento de LIO").font(.system(size: 20, weight: .bold)).foregroundStyle(ink)
@@ -28,27 +38,26 @@ struct ReportView: View {
 
             heading("2 · Poder da LIO")
             HStack(alignment: .top, spacing: 16) {
-                powerBlock(.od)
-                powerBlock(.oe)
+                ForEach(eyes) { powerBlock($0) }
             }
 
-            heading("3 · Visão binocular prevista")
+            heading(eyes.count == 2 ? "3 · Visão binocular prevista" : "3 · Visão prevista (\(eyes[0].rawValue))")
             binocularBlock
 
-            heading("4 · Planejamento tórico")
-            HStack(alignment: .top, spacing: 16) {
-                toricBlock(.od)
-                toricBlock(.oe)
+            if !toricEyes.isEmpty {
+                heading("4 · Planejamento tórico")
+                HStack(alignment: .top, spacing: 16) {
+                    ForEach(toricEyes) { toricBlock($0) }
+                }
             }
 
             if let cmp = compareRows {
-                heading("5 · Comparação de lentes — \(model.compareEye.rawValue)")
+                heading("\(toricEyes.isEmpty ? 4 : 5) · Comparação de lentes — \(model.compareEye.rawValue)")
                 table(headers: ["Lente", "Poder", "Residual", "Longe", "66 cm", "40 cm", "Disfotopsia"], rows: cmp, leadingLabel: true, compact: true, firstColumnMinWidth: 150)
                 sub("AV monocular prevista do \(model.compareEye.rawValue), cada lente com a própria constante A" + (model.astigmatismOn ? " · astigmatismo residual considerado" : "") + ".")
             }
 
             disclaimer
-            signatures
         }
         .font(.system(size: 13))
         .foregroundStyle(ink)
@@ -77,7 +86,7 @@ struct ReportView: View {
             func v(_ s: String) -> String { Num.parse(s).map { _ in s } ?? "—" }
             return [eye.rawValue, v(f.al), v(f.k1), v(f.k2), Num.fmt(f.km), v(f.acd), v(f.lt), v(f.wtw), v(f.cct), v(f.tk1), v(f.tk2)]
         }
-        return table(headers: ["Olho", "AL", "K1", "K2", "Km", "ACD", "LT", "WTW", "CCT", "TK1", "TK2"], rows: [row(.od), row(.oe)], leadingLabel: true, compact: true)
+        return table(headers: ["Olho", "AL", "K1", "K2", "Km", "ACD", "LT", "WTW", "CCT", "TK1", "TK2"], rows: eyes.map(row), leadingLabel: true, compact: true)
     }
 
     @ViewBuilder
@@ -109,8 +118,8 @@ struct ReportView: View {
             let s = DefocusModel.snellen(fromLogMAR:)
             table(headers: ["Longe", "Interm. (66cm)", "Perto (40cm)", "Estereopsia"],
                   rows: [[s(far), s(inter), s(near), model.stereopsis() ?? "—"]], small: true)
-            sub("Curva binocular" + (model.astigmatismOn
-                ? " · astigmatismo considerado (OD \(Num.fmt(model.od.cylinderValue)) D / OE \(Num.fmt(model.oe.cylinderValue)) D)" : "") + ".")
+            sub((eyes.count == 2 ? "Curva binocular" : "Curva monocular do \(eyes[0].rawValue)") + (model.astigmatismOn
+                ? " · astigmatismo considerado (" + eyes.map { "\($0.rawValue) \(Num.fmt(model[$0].cylinderValue)) D" }.joined(separator: " / ") + ")" : "") + ".")
         } else {
             sub("Selecione LIO em ao menos um olho.")
         }
@@ -177,23 +186,6 @@ struct ReportView: View {
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: 0xfde68a)))
             .padding(.top, 16)
-    }
-
-    private var signatures: some View {
-        HStack {
-            signature("Assinatura do cirurgião")
-            Spacer()
-            signature("Paciente")
-        }
-        .padding(.top, 34)
-    }
-
-    private func signature(_ t: String) -> some View {
-        VStack(spacing: 4) {
-            Rectangle().fill(Color(hex: 0x94a3b8)).frame(height: 1)
-            Text(t).font(.system(size: 11)).foregroundStyle(Color(hex: 0x475569))
-        }
-        .frame(maxWidth: 300)
     }
 
     // MARK: tabela

@@ -433,9 +433,9 @@ extension CalculatorModel {
         Eye.allCases.filter { eyeActive($0) }.compactMap { self[$0].lens?.dysphotopsia }.max() ?? 0
     }
 
-    /// AV (logMAR) usada em um quadro; `nil` sem olho ativo.
-    func simulationAcuity(_ tile: VisualSimulation.Tile) -> Double? {
-        binocularVA(at: tile.defocus).map { VisualSimulation.acuity($0, night: simulationNight) }
+    /// AV (logMAR) de uma distância da cena (dia ou noite); `nil` sem olho ativo.
+    func simulationAcuity(_ d: VisualSimulation.Distance, night: Bool) -> Double? {
+        binocularVA(at: d.defocus).map { VisualSimulation.acuity($0, night: night) }
     }
 }
 
