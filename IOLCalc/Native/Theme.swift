@@ -50,8 +50,9 @@ struct SectionCard<Content: View>: View {
             content
         }
         .padding(EdgeInsets(top: 18, leading: 20, bottom: 18, trailing: 20))
-        .background(Theme.card)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        // Sem `clipShape` no cartão: no macOS 26 os controles AppKit (menus, caixas de seleção,
+        // setas dos DisclosureGroup) ficavam quase transparentes dentro de um contêiner recortado.
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 14))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.line))
     }
 }
@@ -73,9 +74,10 @@ struct EyeCard<Content: View>: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.soft)
-        .overlay(alignment: .top) { Rectangle().fill(Theme.accent(eye)).frame(height: 3) }
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .background(Theme.soft, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(alignment: .top) {
+            Rectangle().fill(Theme.accent(eye)).frame(height: 3).clipShape(UnevenRoundedRectangle(topLeadingRadius: 12, topTrailingRadius: 12))
+        }
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.line))
     }
 }

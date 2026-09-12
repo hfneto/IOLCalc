@@ -26,9 +26,19 @@ struct SimulationSection: View {
     private func sceneBlock(_ scene: SimulationScene) -> some View {
         let acuities = VisualSimulation.distances.map { model.simulationAcuity($0, night: scene.night) }
         return VStack(spacing: 0) {
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 10) { header(scene, acuities); Spacer(minLength: 0); if scene.night { haloPicker } }
-                VStack(alignment: .leading, spacing: 6) { header(scene, acuities); if scene.night { haloPicker } }
+            Group {
+                #if os(iOS)
+                VStack(alignment: .leading, spacing: 6) {
+                    header(scene, acuities)
+                    if scene.night { haloPicker }
+                }
+                #else
+                HStack(spacing: 10) {
+                    header(scene, acuities)
+                    Spacer(minLength: 0)
+                    if scene.night { haloPicker }
+                }
+                #endif
             }
             .padding(.horizontal, 10).padding(.vertical, 7)
             .background(Theme.soft)
@@ -151,7 +161,7 @@ struct SimulationSceneView: View {
     private let screenRect = CGRect(x: 0.37, y: 0.09, width: 0.55, height: 0.845)
 
     var body: some View {
-        Canvas(rendersAsynchronously: true) { ctx, size in
+        Canvas(rendersAsynchronously: false) { ctx, size in
             render(&ctx, size: size)
         }
     }

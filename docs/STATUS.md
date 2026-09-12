@@ -56,6 +56,15 @@ A Fase 6 foi feita direto em `main` (o worktree `worktree-biometria-swiftui` em
 - Roadmap de saída do WordPress em `docs/ROADMAP.md`; canvas de design:
   https://claude.ai/code/artifact/53b9c69e-7379-446f-951d-d1488f7621e4
 
+## Incidente resolvido em 12/09 (noite): "não consigo escolher a lente"
+Causa: o Mac do usuário está em modo escuro. A tela nativa tem paleta clara fixa (`Theme`), mas os
+controles AppKit (menus `Picker`, caixas `Toggle`, setas de `DisclosureGroup`) e o texto padrão
+seguiam o esquema escuro do sistema: brancos sobre fundo claro, invisíveis. O seletor sempre
+funcionou (provado por `-iol_popup_test`). Correção: `.preferredColorScheme(.light)` em `RootView`.
+Diagnóstico feito com capturas da janela ao vivo (`screencapture -l <CGWindowID>`; as capturas por
+`cacheDisplay` não mostravam o problema porque desenham por outro caminho). Se um dia quiser modo
+escuro de verdade, é preciso uma paleta escura no `Theme`, não só tirar essa linha.
+
 ## Pendências do usuário
 1. Abrir o app, colar a chave da API (console.anthropic.com) e ler um laudo real na tela nativa.
 2. Testar no iPhone (instruções na conversa: simulador sem Apple ID; aparelho físico com Apple ID +
