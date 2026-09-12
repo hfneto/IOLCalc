@@ -1,3 +1,7 @@
+> **OBSOLETO (11/09/2026).** Este plugin nunca foi instalado. A leitura por IA passou a ser feita
+> dentro do app (`IOLCalc/AIReader.swift`), com a chave da API no Keychain. O WordPress não é mais
+> usado. Mantido só como referência histórica.
+
 # Plugin WordPress `iol-calc-proxy.php` (v2.2)
 
 Instale no WordPress do drhallim.com.br substituindo o plugin atual (Plugins > Adicionar novo > Enviar plugin, ou copie o arquivo para `wp-content/plugins/iol-calc-proxy/`).

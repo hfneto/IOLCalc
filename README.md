@@ -11,9 +11,9 @@ Sucessor da versão web publicada em drhallim.com.br/calculo (que será desconti
 | `IOLCore/` | Pacote Swift com o motor nativo: fórmulas (SRK/T, T2, Holladay 1 ± Wang-Koch, Hoffer Q, Haigis, Castrop), catálogo de lentes, curva de defocus, visão binocular e estereopsia. |
 | `IOLCore/Tests` | Testes contra valores gerados pelo JavaScript original (`docs/golden-generator.js`). |
 | `Web/` | Snapshot da versão web (index.html, service worker, plugin PHP do proxy de IA). Referência histórica. |
-| `server/` | Plugin WordPress `iol-calc-proxy.php` v2.2 (login por e-mail/senha + token, CCT na leitura por IA). Precisa ser instalado no site. |
+| `server/` | **Obsoleto.** Plugin WordPress v2.2 que nunca foi instalado; a leitura por IA agora é feita no app. Mantido só como referência. |
 | `design/` | Pranchas do layout desktop (canvas do Claude Design) usadas como referência da interface. |
-| `docs/` | Artigo da fórmula de regressão tórica e o gerador de valores de referência. |
+| `docs/` | `ROADMAP.md` (saída do WordPress), `STATUS.md`, artigo da regressão tórica e o gerador de valores de referência. |
 
 ## Como rodar
 
@@ -29,20 +29,21 @@ xcodebuild -scheme IOLCalc -destination 'platform=macOS' build
 cd IOLCore && swift test
 ```
 
-## Login e leitura por IA
+## Leitura por IA
 
-Na primeira abertura o app pede e-mail e senha da conta do WordPress (drhallim.com.br). Com o plugin
-v2.2 instalado, o servidor devolve um token de 180 dias que fica no Keychain; a página recebe
-`window.IOL_NATIVE.auth` e nunca mais mostra senha. Enquanto o plugin antigo estiver no ar, o app usa
-a senha digitada como senha de acesso compartilhada (modo legado). "Sair da conta" fica em
-Biometria › Leitura por IA · avançado.
+Na primeira abertura o app pede a **chave da API da Anthropic** (`sk-ant-…`, criada em
+console.anthropic.com). Ela é conferida com `GET /v1/models`, guardada no Keychain do aparelho e
+nunca sai dele: o laudo vai direto do app para `api.anthropic.com` (`IOLCalc/AIReader.swift`), sem
+servidor intermediário. A página injeta `window.IOL_NATIVE.ai` e chama
+`webkit.messageHandlers.aiRead` para ler o laudo. "Trocar chave da API" fica em
+Biometria › Leitura por IA · avançado. O WordPress não é mais usado para nada.
 
 ## Como o híbrido funciona
 
 - `IOLCalc/index.html` é uma cópia da versão web (sem o registro do service worker).
-- A página é carregada com a origem `https://drhallim.com.br/calculo/`. Assim a leitura de laudos
-  por IA continua chamando `/wp-json/iol/v1/read` como mesma origem (sem CORS) e o `localStorage`
-  (senha da IA, método de cálculo) tem um domínio estável.
+- A página é carregada com a origem `https://drhallim.com.br/calculo/` apenas para que o
+  `localStorage` (modelo de IA, método de cálculo) tenha um domínio estável; nenhuma chamada de rede
+  vai para o site (ver fase 2 do `docs/ROADMAP.md`).
 - Links externos (Barrett, Kane, ESCRS…) abrem no navegador do sistema.
 - O botão **Relatório** abre uma sheet com o relatório, com impressão e exportação em PDF.
 - Em **Calculadoras oficiais**, cada botão abre a calculadora (Barrett, Kane, ESCRS, Hill-RBF, Lucena) numa
@@ -50,9 +51,6 @@ Biometria › Leitura por IA · avançado.
 
 ## Plano de migração para nativo
 
-1. **Fórmulas** — feito em `IOLCore` (paridade 1e-9 D com o JS).
-2. Tela de biometria + cálculo do poder em SwiftUI, usando `IOLCore`.
-3. Curva de defocus em Swift Charts.
-4. Leitura de laudo por IA nativa (câmera + URLSession), dispensando o WKWebView para essa etapa.
-5. Planejamento tórico e simulação visual.
-6. Remover o `index.html` quando todos os módulos estiverem nativos.
+Ver `docs/ROADMAP.md`. Resumo: fórmulas (feito) → IA no app (feito) → desligar o site → origem
+própria → biometria e cálculo em SwiftUI → Swift Charts → IA com câmera → tórica e simulação →
+relatório nativo → remover o `index.html`.

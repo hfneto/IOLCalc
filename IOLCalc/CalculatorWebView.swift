@@ -9,9 +9,9 @@ import AppKit
 typealias PlatformViewRepresentable = NSViewRepresentable
 #endif
 
-/// Origem com que a página embutida é carregada. Torna as chamadas relativas
-/// (`/wp-json/iol/v1/read`) mesma origem, dispensando CORS, e dá ao `localStorage`
-/// (senha da IA, método de cálculo) um domínio estável.
+/// Origem com que a página embutida é carregada. Hoje serve só para dar ao `localStorage`
+/// (modelo de IA, método de cálculo, preferências) um domínio estável; nenhuma chamada de
+/// rede vai mais para esse domínio (a leitura por IA é feita em Swift, ver `AIReader`).
 enum CalculatorPage {
     static let baseURL = URL(string: "https://drhallim.com.br/calculo/")!
 
@@ -30,10 +30,13 @@ struct CalculatorWebView: PlatformViewRepresentable {
     /// Chamado quando a página abre uma janela vazia (relatório) e escreve nela.
     let onPopup: (WKWebView) -> Void
     let onOpenCalculator: (ExternalCalculator) -> Void
-    let onLogout: () -> Void
+    /// A página pediu para trocar a chave da API.
+    let onChangeKey: () -> Void
+    /// Leitura de laudo pedida pela página; devolve o texto da IA (JSON).
+    let aiRead: (AIReadRequest) async throws -> String
 
     func makeCoordinator() -> WebCoordinator {
-        WebCoordinator(onPopup: onPopup, onOpenCalculator: onOpenCalculator, onLogout: onLogout)
+        WebCoordinator(onPopup: onPopup, onOpenCalculator: onOpenCalculator, onChangeKey: onChangeKey, aiRead: aiRead)
     }
 
     private func update(_ view: WKWebView, _ context: Context) {
@@ -65,16 +68,19 @@ struct ExistingWebView: PlatformViewRepresentable {
     #endif
 }
 
-final class WebCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
+final class WebCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler, WKScriptMessageHandlerWithReply {
     let onPopup: (WKWebView) -> Void
     let onOpenCalculator: (ExternalCalculator) -> Void
-    let onLogout: () -> Void
+    let onChangeKey: () -> Void
+    let aiRead: (AIReadRequest) async throws -> String
     private(set) var injectedState: NativeState?
 
-    init(onPopup: @escaping (WKWebView) -> Void, onOpenCalculator: @escaping (ExternalCalculator) -> Void, onLogout: @escaping () -> Void) {
+    init(onPopup: @escaping (WKWebView) -> Void, onOpenCalculator: @escaping (ExternalCalculator) -> Void,
+         onChangeKey: @escaping () -> Void, aiRead: @escaping (AIReadRequest) async throws -> String) {
         self.onPopup = onPopup
         self.onOpenCalculator = onOpenCalculator
-        self.onLogout = onLogout
+        self.onChangeKey = onChangeKey
+        self.aiRead = aiRead
     }
 
     /// Reinstala o script `window.IOL_NATIVE` (roda antes da página, a cada carga).
@@ -94,7 +100,9 @@ final class WebCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScri
         config.allowsInlineMediaPlayback = true
         #endif
         config.userContentController.add(self, name: "openCalc")
-        config.userContentController.add(self, name: "logout")
+        config.userContentController.add(self, name: "changeApiKey")
+        // `aiRead` responde com Promise na página: postMessage({...}) → {text} ou rejeição com a mensagem de erro.
+        config.userContentController.addScriptMessageHandler(self, contentWorld: .page, name: "aiRead")
 
         let webView = WKWebView(frame: .zero, configuration: config)
         inject(state, into: webView)
@@ -143,10 +151,23 @@ final class WebCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScri
 
     // MARK: - Mensagens da página (window.webkit.messageHandlers.*)
 
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage, replyHandler: @escaping (Any?, String?) -> Void) {
+        guard message.name == "aiRead" else { replyHandler(nil, "handler desconhecido"); return }
+        guard let req = AIReadRequest(body: message.body) else { replyHandler(nil, "Arquivo ausente."); return }
+        Task {
+            do {
+                let text = try await aiRead(req)
+                await MainActor.run { replyHandler(["text": text], nil) }
+            } catch {
+                await MainActor.run { replyHandler(nil, error.localizedDescription) }
+            }
+        }
+    }
+
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         switch message.name {
-        case "logout":
-            onLogout()
+        case "changeApiKey":
+            onChangeKey()
         case "openCalc":
             guard let body = message.body as? [String: Any],
                   let name = body["name"] as? String,
