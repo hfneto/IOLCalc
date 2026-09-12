@@ -134,8 +134,30 @@ enum DebugSnapshot {
                 scroll.contentView.scroll(to: NSPoint(x: 0, y: toBottom ? maxY : min(offset, maxY)))
                 scroll.reflectScrolledClipView(scroll.contentView)
             }
+            // `-iol_popup_test <txt>`: lista os NSPopUpButton da janela, escolhe o 4º item do primeiro
+            // (o seletor de LIO do OD) e dispara a ação, como um clique; a captura mostra o resultado.
+            if let report = UserDefaults.standard.string(forKey: "iol_popup_test"), let view = window.contentView {
+                var log: [String] = []
+                let popups = allViews(in: view).compactMap { $0 as? NSPopUpButton }
+                for (i, p) in popups.enumerated() {
+                    log.append("popup \(i): items=\(p.numberOfItems) selected='\(p.titleOfSelectedItem ?? "")' enabled=\(p.isEnabled) frame=\(p.frame) hidden=\(p.isHiddenOrHasHiddenAncestor)")
+                }
+                if popups.count > 1, case let first = popups[1], first.numberOfItems > 3 {
+                    first.selectItem(at: 3)
+                    first.menu?.performActionForItem(at: 3) // o mesmo caminho de um clique no item
+                    if let action = first.action { NSApp.sendAction(action, to: first.target, from: first) }
+                    log.append("selected '\(first.titleOfSelectedItem ?? "")' on popup 1")
+                }
+                try? log.joined(separator: "\n").write(toFile: report, atomically: true, encoding: .utf8)
+            }
             DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
                 defer { NSApp.terminate(nil) }
+                if let report = UserDefaults.standard.string(forKey: "iol_popup_test"), let view = window.contentView,
+                   let existing = try? String(contentsOfFile: report, encoding: .utf8) {
+                    let popups = allViews(in: view).compactMap { $0 as? NSPopUpButton }
+                    let after = popups.prefix(2).map { "after: '\($0.titleOfSelectedItem ?? "")'" }.joined(separator: " | ")
+                    try? (existing + "\n" + after + "\n").write(toFile: report, atomically: true, encoding: .utf8)
+                }
                 guard let view = window.contentView else { return }
                 view.layoutSubtreeIfNeeded()
                 window.display()
@@ -144,6 +166,10 @@ enum DebugSnapshot {
                 try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
             }
         }
+    }
+
+    private static func allViews(in view: NSView) -> [NSView] {
+        [view] + view.subviews.flatMap { allViews(in: $0) }
     }
 
     private static func firstScrollView(in view: NSView) -> NSScrollView? {

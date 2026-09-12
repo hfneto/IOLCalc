@@ -91,6 +91,8 @@ A Fase 6 foi feita direto em `main` (o worktree `worktree-biometria-swiftui` em
   `-iol_sim_snapshot <png>` a seção 6 (dia e noite; `-iol_sim_astig YES` liga o astigmatismo). No `ImageRenderer`
   os controles AppKit (campos, seletores, links) saem como retângulos amarelos — é limitação da
   captura, não do app; use `-iol_snapshot` para vê-los.
+  `-iol_popup_test <txt>` escolhe a 4ª lente no seletor do OD pelo caminho de um clique (menu →
+  ação) e registra o antes/depois — serve para provar que o seletor funciona sem tocar na interface;
   `-iol_ai_fake_file <txt>` aplica um JSON como se viesse da IA; `-iol_prep_test <imagem>` grava
   `<imagem>.txt` com o resultado do preparo de upload.
 - Valores dourados: `jsc docs/toric-generator.js > IOLCore/Tests/IOLCoreTests/Resources/toric.json`
