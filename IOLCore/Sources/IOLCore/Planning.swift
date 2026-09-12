@@ -170,7 +170,7 @@ public enum PowerPlanner {
     }
 
     /// `Math.round` do JavaScript: meio arredonda para +∞ (−1,5 → −1).
-    static func roundHalfUp(_ x: Double) -> Double {
+    public static func roundHalfUp(_ x: Double) -> Double {
         (x + 0.5).rounded(.down)
     }
 }

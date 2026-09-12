@@ -70,6 +70,13 @@ final class CalculatorModel {
     // Seção 5
     var astigmatismOn = false
     var showMonocular = false
+    // Seção 6
+    var simulationNight = false
+    /// Variação individual dos halos: 0 melhor caso, 1 mais comum, 2 pior caso.
+    var simulationHaloMode = 1
+    // Seção 7
+    var odToric = ToricForm(siaAxis: "180")
+    var oeToric = ToricForm(siaAxis: "0")
     // Comparador
     var compareEye: Eye = .od
     var compareA = ""
@@ -102,6 +109,8 @@ final class CalculatorModel {
         showMonocular = true
         compareA = "vivity"
         compareB = "panoptix"
+        suggestToric(.od)
+        suggestToric(.oe)
     }
 
     private func save() {
@@ -226,6 +235,176 @@ final class CalculatorModel {
                                      aConstant: a, method: method, deltaA: currentDeltaA,
                                      target: Num.parse(form.target) ?? 0)
         return .plan(plan)
+    }
+}
+
+/// Planejamento tórico de um olho, como digitado. Os campos "override" ficam `nil` enquanto o
+/// usuário não os edita: até lá seguem a biometria da seção 1 (como os `dataset.touched` da web).
+struct ToricForm: Equatable {
+    var modelOverride: CornealAstigmatismModel?
+    var k1Override: String?
+    var k2Override: String?
+    var kAxisOverride: String?
+    var totalCylinderOverride: String?
+    var totalAxisOverride: String?
+    var sia = "0,10"
+    var siaAxis: String
+    var iolCylinder = "0,00"
+    var iolAxis = "90"
+    /// Plataforma escolhida à mão; vale enquanto a LIO da seção 2 for a mesma (depois segue o fabricante).
+    var platformOverride: PlatformChoice?
+    /// Razão digitada; vale enquanto a plataforma em vigor for a mesma.
+    var ratioOverride: RatioChoice?
+
+    struct PlatformChoice: Equatable { var lensID: String; var id: String }
+    struct RatioChoice: Equatable { var platformID: String; var text: String }
+
+    init(siaAxis: String) { self.siaAxis = siaAxis }
+}
+
+/// Razão de toricidade em vigor e a sua origem.
+struct ToricRatio {
+    enum Source: String { case manual = "(manual)", eye = "(ELP do olho)", platform = "(padrão plataforma)" }
+    let value: Double
+    let source: Source
+}
+
+extension CalculatorModel {
+    subscript(toric eye: Eye) -> ToricForm {
+        get { eye == .od ? odToric : oeToric }
+        set { if eye == .od { odToric = newValue } else { oeToric = newValue } }
+    }
+
+    // MARK: Campos efetivos (override ou biometria)
+
+    /// Com TK medido a base passa a "Total" automaticamente (`pullTorK` da web).
+    func toricModel(_ eye: Eye) -> CornealAstigmatismModel {
+        self[toric: eye].modelOverride ?? (self[eye].hasTK ? .total : .abulafiaKoch)
+    }
+
+    func toricK1Text(_ eye: Eye) -> String { self[toric: eye].k1Override ?? self[eye].k1 }
+    func toricK2Text(_ eye: Eye) -> String { self[toric: eye].k2Override ?? self[eye].k2 }
+    func toricKAxisText(_ eye: Eye) -> String { self[toric: eye].kAxisOverride ?? (self[eye].kAxis.isEmpty ? "90" : self[eye].kAxis) }
+    func toricTotalCylinderText(_ eye: Eye) -> String {
+        if let o = self[toric: eye].totalCylinderOverride { return o }
+        let f = self[eye]
+        if let a = Num.parse(f.tk1), let b = Num.parse(f.tk2) { return Num.fmt(abs(b - a)) }
+        return ""
+    }
+    func toricTotalAxisText(_ eye: Eye) -> String { self[toric: eye].totalAxisOverride ?? (self[eye].tkAxis.isEmpty ? "90" : self[eye].tkAxis) }
+
+    /// Origem dos K mostrada no cabeçalho do cartão.
+    func toricSourceLabel(_ eye: Eye) -> String {
+        let f = self[eye]
+        if let a = Num.parse(f.tk1), let b = Num.parse(f.tk2) { return "TK da biometria (ΔTK \(Num.fmt(abs(b - a))) D)" }
+        if let d = f.deltaK { return "da biometria (ΔK \(Num.fmt(d)) D)" }
+        return "preencha K1/K2 na Biometria"
+    }
+
+    func toricPlatformID(_ eye: Eye) -> String {
+        let form = self[eye]
+        if let o = self[toric: eye].platformOverride, o.lensID == form.lensID { return o.id }
+        return form.lens.map { ToricPlatform.id(forManufacturer: $0.manufacturer) } ?? ToricPlatform.all[0].id
+    }
+
+    func toricPlatform(_ eye: Eye) -> ToricPlatform { ToricPlatform.platform(id: toricPlatformID(eye)) }
+
+    func setToricPlatform(_ id: String, for eye: Eye) {
+        self[toric: eye].platformOverride = .init(lensID: self[eye].lensID, id: id)
+    }
+
+    /// Razão: manual > calculada pela ELP do olho (SRK/T com o poder sugerido) > padrão da plataforma.
+    func toricRatio(_ eye: Eye) -> ToricRatio {
+        let platform = toricPlatform(eye)
+        if let o = self[toric: eye].ratioOverride, o.platformID == platform.id {
+            return ToricRatio(value: Num.parse(o.text) ?? ToricInput().ratio, source: .manual)
+        }
+        if case .plan(let plan) = result(for: eye),
+           let r = ToricPlanner.toricityRatio(eye: plan.eye, effectiveA: plan.effectiveA, implantedPower: plan.chosen.power,
+                                              iolCylinder: Num.parse(self[toric: eye].iolCylinder) ?? 0) {
+            return ToricRatio(value: r, source: .eye)
+        }
+        return ToricRatio(value: platform.ratio, source: .platform)
+    }
+
+    /// Texto do campo de razão (2 casas, como a web preenche).
+    func toricRatioText(_ eye: Eye) -> String {
+        if let o = self[toric: eye].ratioOverride, o.platformID == toricPlatformID(eye) { return o.text }
+        return Num.fmt(toricRatio(eye).value)
+    }
+
+    func setToricRatioText(_ text: String, for eye: Eye) {
+        self[toric: eye].ratioOverride = .init(platformID: toricPlatformID(eye), text: text)
+    }
+
+    // MARK: Cálculo
+
+    func toricInput(_ eye: Eye) -> ToricInput {
+        let t = self[toric: eye]
+        var i = ToricInput()
+        i.model = toricModel(eye)
+        i.k1 = Num.parse(toricK1Text(eye))
+        i.k2 = Num.parse(toricK2Text(eye))
+        i.kAxis = Num.parse(toricKAxisText(eye)) ?? 90
+        i.totalCylinder = Num.parse(toricTotalCylinderText(eye)) ?? 0
+        i.totalAxis = Num.parse(toricTotalAxisText(eye)) ?? 90
+        i.sia = Num.parse(t.sia) ?? 0
+        i.siaAxis = Num.parse(t.siaAxis) ?? 180
+        i.iolCylinder = Num.parse(t.iolCylinder) ?? 0
+        i.iolAxis = Num.parse(t.iolAxis) ?? 90
+        i.ratio = toricRatio(eye).value
+        return i
+    }
+
+    func toricPlan(_ eye: Eye) -> ToricPlan { ToricPlanner.plan(toricInput(eye)) }
+
+    /// "Sugerir ideal": degrau da plataforma mais próximo e eixo no meridiano curvo total.
+    func suggestToric(_ eye: Eye) {
+        let s = ToricPlanner.suggestion(for: toricPlan(eye), platform: toricPlatform(eye))
+        self[toric: eye].iolCylinder = Num.fmt(s.cylinder)
+        self[toric: eye].iolAxis = Num.fmt(s.axis, 0)
+    }
+
+    func alignToricToTotal(_ eye: Eye) {
+        self[toric: eye].iolAxis = Num.fmt(PowerPlanner.roundHalfUp(toricPlan(eye).totalAxis), 0)
+    }
+
+    /// Copia os campos tóricos de um olho para o outro (os que seguem a biometria continuam seguindo).
+    func copyToric(from: Eye, to: Eye) {
+        var dst = self[toric: to]
+        let src = self[toric: from]
+        dst.modelOverride = src.modelOverride
+        dst.k1Override = src.k1Override; dst.k2Override = src.k2Override; dst.kAxisOverride = src.kAxisOverride
+        dst.totalCylinderOverride = src.totalCylinderOverride; dst.totalAxisOverride = src.totalAxisOverride
+        dst.sia = src.sia; dst.siaAxis = src.siaAxis
+        dst.iolCylinder = src.iolCylinder; dst.iolAxis = src.iolAxis
+        let platformID = toricPlatformID(from)
+        dst.platformOverride = .init(lensID: self[to].lensID, id: platformID)
+        dst.ratioOverride = src.ratioOverride.map { .init(platformID: platformID, text: $0.text) }
+        self[toric: to] = dst
+    }
+
+    // MARK: - Seção 6: simulação visual
+
+    /// Astigmatismo residual usado nos quadros: o olho "dominante" é o de menor cilindro.
+    func simulationAstigmatism() -> (cylinder: Double, axis: Double)? {
+        guard astigmatismOn else { return nil }
+        var best: (cylinder: Double, axis: Double)?
+        for eye in Eye.allCases where eyeActive(eye) {
+            let c = self[eye].cylinderValue
+            if best == nil || c < best!.cylinder { best = (c, Num.parse(self[eye].cylinderAxis) ?? 90) }
+        }
+        return best
+    }
+
+    /// Grau de disfotopsia da combinação (o maior entre as lentes ativas).
+    func simulationDysphotopsia() -> Int {
+        Eye.allCases.filter { eyeActive($0) }.compactMap { self[$0].lens?.dysphotopsia }.max() ?? 0
+    }
+
+    /// AV (logMAR) usada em um quadro; `nil` sem olho ativo.
+    func simulationAcuity(_ tile: VisualSimulation.Tile) -> Double? {
+        binocularVA(at: tile.defocus).map { VisualSimulation.acuity($0, night: simulationNight) }
     }
 }
 

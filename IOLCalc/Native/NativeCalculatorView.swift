@@ -1,7 +1,7 @@
 import SwiftUI
 import IOLCore
 
-/// Seções 1 a 3 da calculadora (biometria, lentes e alvo, poder da LIO) em SwiftUI,
+/// Seções 1 a 3, 5, 6 e 7 da calculadora (biometria, lentes e alvo, poder da LIO, defocus, simulação, tórica) em SwiftUI,
 /// calculando com o `IOLCore`. Substitui, aos poucos, a página web embutida.
 struct NativeCalculatorView: View {
     @State private var model = CalculatorModel()
@@ -15,6 +15,8 @@ struct NativeCalculatorView: View {
                 PowerSection(model: model)
                 DefocusSection(model: model)
                 CompareDrawer(model: model)
+                SimulationSection(model: model)
+                ToricSection(model: model)
                 MutedText("Recomendação por AL: olho curto (<22 mm) → Hoffer Q / Haigis / Castrop · médio → todas · longo (>26 mm) → Holladay 1 com ajuste Wang-Koch / T2 / Haigis / Castrop. A sugestão é a mediana das fórmulas recomendadas.", size: 11.5)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }

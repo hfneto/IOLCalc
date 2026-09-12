@@ -190,16 +190,18 @@ struct MetricCard: View {
     let label: String
     let value: String
     let note: String
+    var background: Color = .white
+    var valueSize: CGFloat = 22
 
     var body: some View {
         VStack(spacing: 2) {
             Text(label.uppercased()).font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.muted)
-            Text(value).font(.system(size: 22, weight: .heavy)).foregroundStyle(Theme.ink)
+            Text(value).font(.system(size: valueSize, weight: .heavy)).foregroundStyle(Theme.ink)
             Text(note).font(.system(size: 12)).foregroundStyle(Theme.muted)
         }
         .frame(maxWidth: .infinity)
         .padding(10)
-        .background(Color.white)
+        .background(background)
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.line))
     }

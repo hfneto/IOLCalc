@@ -10,6 +10,11 @@ enum APIKeyStore {
     private static let legacyAccount = "credential"
 
     static func load() -> String? {
+        #if DEBUG
+        // Capturas de depuração rodadas do terminal: o binário recém-compilado faria o Keychain pedir
+        // confirmação e travaria a renderização.
+        if UserDefaults.standard.bool(forKey: "iol_no_keychain") { return nil }
+        #endif
         purgeLegacy()
         let q: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service,
                                 kSecAttrAccount as String: account, kSecReturnData as String: true, kSecMatchLimit as String: kSecMatchLimitOne]

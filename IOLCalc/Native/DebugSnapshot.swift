@@ -26,6 +26,31 @@ enum DebugSnapshot {
         }
     }
 
+    /// `-iol_toric_snapshot <png>` e `-iol_sim_snapshot <png>`: renderizam as seções 7 e 6 do caso de
+    /// exemplo com `ImageRenderer` (largura 1100). `-iol_sim_night YES` liga o modo noturno.
+    @MainActor static func renderSectionsIfRequested() {
+        let d = UserDefaults.standard
+        func write(_ view: some View, to path: String) {
+            let renderer = ImageRenderer(content: view.frame(width: 1100).padding(16).background(Theme.bg))
+            renderer.scale = 2
+            if let img = renderer.nsImage, let tiff = img.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) {
+                try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+            }
+        }
+        if let path = d.string(forKey: "iol_toric_snapshot") {
+            let model = CalculatorModel()
+            model.fillSample()
+            write(ToricSection(model: model), to: path)
+        }
+        if let path = d.string(forKey: "iol_sim_snapshot") {
+            let model = CalculatorModel()
+            model.fillSample()
+            model.astigmatismOn = d.bool(forKey: "iol_sim_astig")
+            model.simulationNight = d.bool(forKey: "iol_sim_night")
+            write(SimulationSection(model: model), to: path)
+        }
+    }
+
     /// `-iol_prep_test <arquivo>`: roda `UploadPrep.prepare` no arquivo e grava `<arquivo>.txt` com
     /// tipo, tamanho do base64 e dimensões da imagem resultante.
     static func prepTestIfRequested() {
@@ -45,6 +70,7 @@ enum DebugSnapshot {
     @MainActor static func runIfRequested() {
         prepTestIfRequested()
         renderChartIfRequested()
+        renderSectionsIfRequested()
         guard let path = UserDefaults.standard.string(forKey: "iol_snapshot") else { return }
         let height = UserDefaults.standard.double(forKey: "iol_snapshot_height")
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {

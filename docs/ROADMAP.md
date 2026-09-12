@@ -1,6 +1,6 @@
 # Roadmap — Calculadora de LIO fora do WordPress
 
-Atualizado em 11/09/2026.
+Atualizado em 12/09/2026.
 
 ## Onde o WordPress entrava
 
@@ -56,10 +56,11 @@ Câmera/scanner (VisionKit), fotos e PDF direto no app, chamando `AIReader` sem 
 WebView. `AIReader` já está pronto para isso; falta só a interface e o preenchimento dos campos
 nativos da fase 3.
 
-## Fase 6 — Tórica e simulação visual (2 sessões)
+## Fase 6 — Tórica e simulação visual ✅ (12/09/2026)
 
-Planejamento tórico (SIA vetorial, regressão do artigo em `docs/`) e simulação em quadros
-ampliados, desenhada em `Canvas`.
+Planejamento tórico (SIA vetorial, Abulafia-Koch do artigo em `docs/`, Næser-Savini, TK medido,
+razão de toricidade pela ELP) em `IOLCore/Toric.swift` + `ToricSection`, com diagrama arrastável;
+simulação em quadros ampliados desenhada em `Canvas` (`SimulationSection`).
 
 ## Fase 7 — Relatório nativo (1 sessão)
 

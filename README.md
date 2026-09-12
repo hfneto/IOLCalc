@@ -7,9 +7,9 @@ Sucessor da versão web publicada em drhallim.com.br/calculo (que será desconti
 | Pasta | O que é |
 |---|---|
 | `IOLCalc.xcodeproj` | Projeto Xcode. Um único target `IOLCalc` para iPhone, iPad e Mac. |
-| `IOLCalc/` | App SwiftUI. Alterna entre a calculadora web embutida (`index.html` em `WKWebView`) e a versão nativa em `IOLCalc/Native/` (seções 1 a 5, "Nativo · beta"). |
-| `IOLCore/` | Pacote Swift com o motor nativo: fórmulas (SRK/T, T2, Holladay 1 ± Wang-Koch, Hoffer Q, Haigis, Castrop), catálogo de lentes, curva de defocus, visão binocular e estereopsia. |
-| `IOLCore/Tests` | Testes contra valores gerados pelo JavaScript original (`docs/golden-generator.js`). |
+| `IOLCalc/` | App SwiftUI. Alterna entre a calculadora web embutida (`index.html` em `WKWebView`) e a versão nativa em `IOLCalc/Native/` (seções 1 a 3 e 5 a 7, "Nativo · beta"). |
+| `IOLCore/` | Pacote Swift com o motor nativo: fórmulas (SRK/T, T2, Holladay 1 ± Wang-Koch, Hoffer Q, Haigis, Castrop), catálogo de lentes, curva de defocus, visão binocular, estereopsia, planejamento tórico (vetores de duplo-ângulo, Abulafia-Koch, Næser-Savini, razão de toricidade) e constantes da simulação visual. |
+| `IOLCore/Tests` | Testes contra valores gerados pelo JavaScript original (`docs/golden-generator.js`, `docs/toric-generator.js`). |
 | `Web/` | Snapshot da versão web (index.html, service worker, plugin PHP do proxy de IA). Referência histórica. |
 | `server/` | **Obsoleto.** Plugin WordPress v2.2 que nunca foi instalado; a leitura por IA agora é feita no app. Mantido só como referência. |
 | `design/` | Pranchas do layout desktop (canvas do Claude Design) usadas como referência da interface. |
@@ -52,14 +52,15 @@ Biometria › Leitura por IA · avançado. O WordPress não é mais usado para n
 ## Plano de migração para nativo
 
 Ver `docs/ROADMAP.md`. Resumo: fórmulas (feito) → IA no app (feito) → desligar o site → origem
-própria → biometria e cálculo em SwiftUI (feito) → Swift Charts (feito) → IA com câmera → tórica e
-simulação → relatório nativo → remover o `index.html`.
+própria → biometria e cálculo em SwiftUI (feito) → Swift Charts (feito) → IA com câmera (feito) →
+tórica e simulação (feito) → relatório nativo → remover o `index.html`.
 
 ## Tela nativa (Nativo · beta)
 
 O seletor no topo do app alterna "Página web" / "Nativo · beta" (`RootView`). A tela nativa
 (`IOLCalc/Native/`) tem as seções 1 a 3 (biometria, lentes e alvo, poder da LIO), a seção 5 (curva de
-defocus, binocular, métricas) e a gaveta de comparação, todas calculando com o `IOLCore`:
+defocus, binocular, métricas), a gaveta de comparação, a seção 6 (simulação visual em `Canvas`) e a
+seção 7 (planejamento tórico com diagrama arrastável), todas calculando com o `IOLCore`:
 
 - `CalculatorModel` guarda os campos como texto (aceita vírgula ou ponto) e persiste método de
   biometria e ΔA nas mesmas chaves da web (`iol_method`, `iol_dA2_*`).
@@ -70,4 +71,15 @@ defocus, binocular, métricas) e a gaveta de comparação, todas calculando com 
 - Argumentos de execução úteis em DEBUG/macOS: `-iol_sample YES` preenche o caso da prancha de
   design; `-iol_snapshot <png>` (com `-iol_snapshot_height`, `-iol_snapshot_scroll` ou
   `-iol_snapshot_bottom YES`) grava a janela em PNG dentro do container do app;
-  `-iol_chart_snapshot <png>` renderiza só o gráfico de defocus.
+  `-iol_chart_snapshot <png>` renderiza só o gráfico de defocus; `-iol_toric_snapshot <png>` e
+  `-iol_sim_snapshot <png>` (com `-iol_sim_night YES`, `-iol_sim_astig YES`) renderizam as seções 7 e 6;
+  `-iol_no_keychain YES` pula o Keychain (um binário recém-compilado faria o sistema pedir confirmação
+  e travaria a captura).
+- `IOLCore/Toric.swift` porta o módulo tórico da web (`torState`/`toricRecalc`): astigmatismo total
+  por K anterior, Abulafia-Koch, Næser-Savini ou TK medido; SIA vetorial; cilindro da LIO convertido
+  ao plano corneano pela razão de toricidade (calculada pela ELP do olho com o SRK/T, senão o padrão
+  da plataforma); residual, desalinhamento e "sugerir ideal". `ToricTests` confere paridade 1e-9 em
+  362 casos gerados pelo JavaScript (`Resources/toric.json`).
+- `SimulationSection` desenha os quatro quadros (celular, notebook, GPS, rua) em `Canvas`, em
+  tamanho físico real, com desfoque gaussiano pela AV binocular prevista, arrasto direcional do
+  astigmatismo, perda de contraste das difrativas e halos/anéis/starburst à noite.
