@@ -24,6 +24,10 @@ git merge --ff-only worktree-biometria-swiftui
   fórmula, alertas). `IOLCore/Planning.swift` com paridade 1e-9 contra o JavaScript.
 - **Fase 4:** seção 5 nativa (curva de defocus em Swift Charts, régua de residual, astigmatismo,
   métricas longe/66 cm/40 cm/estereopsia) e gaveta "Comparar 2 lentes no mesmo olho".
+- **Fase 5:** "Ler laudo com IA" na tela nativa (`BiometryReader.swift`, `AIReadControls.swift`):
+  Mac escolhe arquivos/PDF; iPhone digitaliza com a câmera (VisionKit), Fotos ou Arquivos. Imagens
+  são redimensionadas/recomprimidas como na web, vários laudos são mesclados, valores fora da faixa
+  geram aviso. Gaveta "Leitura por IA · avançado" com modelo e chave da API.
 - Seletor "Página web / Nativo · beta" no topo (`RootView`); a página web continua completa.
 - `IOLCore`: 16 testes passando (`cd IOLCore && swift test`).
 - Roadmap de saída do WordPress em `docs/ROADMAP.md`; canvas de design:
@@ -37,9 +41,8 @@ git merge --ff-only worktree-biometria-swiftui
 5. Opcional: renomear `Auth.swift` → `APIKeyStore.swift` e `LoginView.swift` → `APIKeyView.swift`.
 
 ## Próximos passos sugeridos
-- Fase 5: "Ler laudo com IA" na tela nativa (câmera/arquivo → `AIReader` → campos do
-  `CalculatorModel`), depois Fase 6 (tórica + simulação em `Canvas`), Fase 7 (relatório) e
-  Fase 2 (origem própria) antes de remover o `index.html`.
+- Fase 6 (tórica + simulação em `Canvas`), Fase 7 (relatório nativo) e Fase 2 (origem própria)
+  antes de remover o `index.html`. Testar a leitura por IA nativa com um laudo real.
 - Seção 4 (calculadoras oficiais) na tela nativa: reaproveitar `CalculatorFillSheet` com os
   dados do `CalculatorModel`.
 
@@ -49,4 +52,5 @@ git merge --ff-only worktree-biometria-swiftui
 - Tela nativa (DEBUG/macOS): `-iol_sample YES -iol_native_ui YES -iol_snapshot <png>` grava a
   janela em PNG dentro de `~/Library/Containers/br.com.drhallim.IOLCalc/Data/`; a captura não
   redesenha controles AppKit/eixos do Charts após rolagem, por isso `-iol_chart_snapshot <png>`
-  renderiza só o gráfico com `ImageRenderer`.
+  renderiza só o gráfico com `ImageRenderer`. `-iol_ai_fake_file <txt>` aplica um JSON como se
+  viesse da IA; `-iol_prep_test <imagem>` grava `<imagem>.txt` com o resultado do preparo de upload.

@@ -2,6 +2,8 @@ import SwiftUI
 
 #if os(macOS) && DEBUG
 import AppKit
+import ImageIO
+import UniformTypeIdentifiers
 
 /// Depuração: `-iol_snapshot /caminho/arquivo.png` renderiza a janela principal em PNG
 /// (sem precisar de permissão de gravação de tela) e encerra o app.
@@ -24,7 +26,24 @@ enum DebugSnapshot {
         }
     }
 
+    /// `-iol_prep_test <arquivo>`: roda `UploadPrep.prepare` no arquivo e grava `<arquivo>.txt` com
+    /// tipo, tamanho do base64 e dimensões da imagem resultante.
+    static func prepTestIfRequested() {
+        guard let path = UserDefaults.standard.string(forKey: "iol_prep_test"), let data = try? Data(contentsOf: URL(fileURLWithPath: path)) else { return }
+        let file = PickedFile(data: data, name: (path as NSString).lastPathComponent, type: UTType(filenameExtension: (path as NSString).pathExtension))
+        let t0 = Date()
+        let req = UploadPrep.prepare(file, model: "x")
+        var dims = "-"
+        if !req.isPDF, let d = Data(base64Encoded: req.data), let src = CGImageSourceCreateWithData(d as CFData, nil),
+           let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any] {
+            dims = "\(props[kCGImagePropertyPixelWidth] ?? "?")x\(props[kCGImagePropertyPixelHeight] ?? "?")"
+        }
+        let summary = "input=\(data.count)B isPDF=\(req.isPDF) media=\(req.mediaType) base64=\(req.data.count) dims=\(dims) time=\(Int(Date().timeIntervalSince(t0) * 1000))ms\n"
+        try? summary.write(toFile: path + ".txt", atomically: true, encoding: .utf8)
+    }
+
     @MainActor static func runIfRequested() {
+        prepTestIfRequested()
         renderChartIfRequested()
         guard let path = UserDefaults.standard.string(forKey: "iol_snapshot") else { return }
         let height = UserDefaults.standard.double(forKey: "iol_snapshot_height")

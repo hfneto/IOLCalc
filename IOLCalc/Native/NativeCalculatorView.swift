@@ -44,15 +44,23 @@ struct NativeCalculatorView: View {
 
 struct BiometrySection: View {
     @Bindable var model: CalculatorModel
+    @State private var reader = AIReaderState()
 
     var body: some View {
         SectionCard(title: "1 · Biometria", trailing: AnyView(
-            PillButton(title: "Limpar") { model.clearBiometry() }
+            HStack(spacing: 8) {
+                AIReadControls(model: model, reader: reader)
+                PillButton(title: "Limpar") { model.clearBiometry(); reader.status = nil }
+            }
         )) {
+            if let status = reader.status {
+                AIReadControls.StatusView(status: status)
+            }
             EyePair { eye in
                 BiometryCard(eye: eye, form: binding(eye))
             }
             MutedText("Edite qualquer campo. ACD é necessária para o Haigis; LT e CCT refinam a Castrop. Astigmatismo (ΔK) e TK são só informativos aqui — o planejamento tórico usa TK quando medido.", size: 11.5)
+            AIReadControls.Advanced(reader: reader)
         }
     }
 

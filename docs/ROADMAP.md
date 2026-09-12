@@ -50,7 +50,7 @@ Sugestão "primeira lente sem hipermetropia" e refração prevista por inversão
 
 Curva de defocus e AV binocular em Swift Charts; comparador de lentes em gaveta, como hoje.
 
-## Fase 5 — Leitura por IA nativa (1 sessão)
+## Fase 5 — Leitura por IA nativa ✅ (11/09/2026: scanner VisionKit, Fotos e arquivos → `AIReader` → campos nativos)
 
 Câmera/scanner (VisionKit), fotos e PDF direto no app, chamando `AIReader` sem passar pelo
 WebView. `AIReader` já está pronto para isso; falta só a interface e o preenchimento dos campos

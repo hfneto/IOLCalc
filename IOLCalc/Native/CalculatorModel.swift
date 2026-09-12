@@ -86,6 +86,10 @@ final class CalculatorModel {
         }
         deltaA = d
         if defaults.bool(forKey: "iol_sample") { fillSample() }
+        // Depuração: `-iol_ai_fake_file <arquivo>` aplica o texto do arquivo como se fosse a resposta
+        // da IA (por arquivo porque um argumento começando com "{" é lido como plist pelo UserDefaults).
+        if let path = defaults.string(forKey: "iol_ai_fake_file"), let fake = try? String(contentsOfFile: path, encoding: .utf8),
+           let report = try? BiometryReport.parse(fake) { apply(report) }
     }
 
     /// Caso de exemplo da prancha de design (argumento de execução `-iol_sample YES`).
@@ -194,6 +198,24 @@ final class CalculatorModel {
         patientName = ""
         od.clearBiometry()
         oe.clearBiometry()
+    }
+
+    /// Preenche a biometria com o que a IA leu (como `fillFromJSON` da web): só os campos
+    /// presentes são sobrescritos; o cilindro residual volta a seguir o ΔK.
+    func apply(_ report: BiometryReport) {
+        if let n = report.name { patientName = n }
+        for eye in Eye.allCases {
+            let e = report[eye]
+            var form = self[eye]
+            func set(_ key: String, _ path: WritableKeyPath<EyeForm, String>, digits: Int = 2) {
+                if let v = e[key] { form[keyPath: path] = Num.fmt(v, digits) }
+            }
+            set("AL", \.al); set("K1", \.k1); set("K2", \.k2); set("ACD", \.acd); set("LT", \.lt); set("WTW", \.wtw)
+            set("CCT", \.cct, digits: 0); set("K2_axis", \.kAxis, digits: 0)
+            set("TK1", \.tk1); set("TK2", \.tk2); set("TK2_axis", \.tkAxis, digits: 0)
+            form.cylinderTouched = false
+            self[eye] = form
+        }
     }
 
     func result(for eye: Eye) -> EyeResult {
