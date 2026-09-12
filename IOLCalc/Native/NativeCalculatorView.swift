@@ -13,6 +13,8 @@ struct NativeCalculatorView: View {
                 BiometrySection(model: model)
                 LensSection(model: model)
                 PowerSection(model: model)
+                DefocusSection(model: model)
+                CompareDrawer(model: model)
                 MutedText("Recomendação por AL: olho curto (<22 mm) → Hoffer Q / Haigis / Castrop · médio → todas · longo (>26 mm) → Holladay 1 com ajuste Wang-Koch / T2 / Haigis / Castrop. A sugestão é a mediana das fórmulas recomendadas.", size: 11.5)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -158,29 +160,16 @@ private struct LensCard: View {
     let eye: Eye
     @Bindable var model: CalculatorModel
 
-    private static let groups: [(LensCategory, String)] = [
-        (.monofocal, "Monofocais"), (.enhancedMonofocal, "Enhanced"), (.edof, "EDOF"),
-        (.bifocal, "Bifocais"), (.trifocal, "Trifocais/Pentafocal"), (.continuous, "Contínua/CRV"),
-    ]
-
     var body: some View {
         EyeCard(eye: eye, title: eye.rawValue) {
             VStack(alignment: .leading, spacing: 3) {
                 FieldLabel(text: "LIO")
-                Picker("", selection: Binding(get: { model[eye].lensID }, set: { model.selectLens($0, for: eye) })) {
-                    Text("— selecione a LIO —").tag("")
-                    ForEach(Self.groups, id: \.0) { cat, name in
-                        Section(name) {
-                            ForEach(LensCatalog.all.filter { $0.category == cat }) { Text($0.name).tag($0.id) }
-                        }
-                    }
-                }
-                .labelsHidden()
-                .frame(maxWidth: .infinity, alignment: .leading)
+                LensPicker(selection: Binding(get: { model[eye].lensID }, set: { model.selectLens($0, for: eye) }))
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             HStack(alignment: .top, spacing: 8) {
                 NumberField(label: "Constante A", text: Binding(get: { model[eye].aConstant }, set: { model[eye].aConstant = $0 }))
-                NumberField(label: "Alvo (D, equiv. esf.)", text: Binding(get: { model[eye].target }, set: { model[eye].target = $0 }))
+                NumberField(label: "Alvo (D, equiv. esf.)", text: Binding(get: { model[eye].target }, set: { model.setTarget($0, for: eye) }))
             }
             if let l = model[eye].lens {
                 MutedText("\(l.manufacturer) · \(l.type) · A ref \(Num.fmt(l.aConstant)) · disfotopsia \(["baixa", "baixa-mod", "moderada", "alta"][l.dysphotopsia])")

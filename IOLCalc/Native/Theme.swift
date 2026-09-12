@@ -1,4 +1,5 @@
 import SwiftUI
+import IOLCore
 
 /// Paleta da calculadora web (`:root` do index.html), para a tela nativa ficar idêntica.
 enum Theme {
@@ -19,6 +20,8 @@ enum Theme {
     static let errInk = Color(hex: 0x991b1b)
     static let chipBg = Color(hex: 0xe2e8f0)
     static let chipInk = Color(hex: 0x475569)
+    static let bino = Color(hex: 0x7c3aed)
+    static let warn = Color(hex: 0xd97706)
 
     static func accent(_ eye: Eye) -> Color { eye == .od ? od : oe }
 }
@@ -156,6 +159,49 @@ struct PillButton: View {
             .overlay(RoundedRectangle(cornerRadius: 9).stroke(primary ? Theme.brand : Theme.line))
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// Seletor de LIO agrupado por categoria, como o `<select>` da web.
+struct LensPicker: View {
+    @Binding var selection: String
+    var placeholder = "— selecione a LIO —"
+
+    static let groups: [(LensCategory, String)] = [
+        (.monofocal, "Monofocais"), (.enhancedMonofocal, "Enhanced"), (.edof, "EDOF"),
+        (.bifocal, "Bifocais"), (.trifocal, "Trifocais/Pentafocal"), (.continuous, "Contínua/CRV"),
+    ]
+
+    var body: some View {
+        Picker("", selection: $selection) {
+            Text(placeholder).tag("")
+            ForEach(Self.groups, id: \.0) { cat, name in
+                Section(name) {
+                    ForEach(LensCatalog.all.filter { $0.category == cat }) { Text($0.name).tag($0.id) }
+                }
+            }
+        }
+        .labelsHidden()
+    }
+}
+
+/// Cartão de métrica (rótulo, valor grande, nota).
+struct MetricCard: View {
+    let label: String
+    let value: String
+    let note: String
+
+    var body: some View {
+        VStack(spacing: 2) {
+            Text(label.uppercased()).font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.muted)
+            Text(value).font(.system(size: 22, weight: .heavy)).foregroundStyle(Theme.ink)
+            Text(note).font(.system(size: 12)).foregroundStyle(Theme.muted)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(10)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.line))
     }
 }
 

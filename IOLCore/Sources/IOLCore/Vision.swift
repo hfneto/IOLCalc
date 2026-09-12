@@ -13,6 +13,30 @@ public enum DefocusModel {
     public static let extrapolationFrom = -3.0
     /// Ganho binocular (~1 linha) em olhos simétricos.
     public static let summationLogMAR = 0.07
+    /// Pontos plotados no gráfico: +1,0 a −4,0 D em passos de 0,25 (21 pontos), como a versão web.
+    public static let plotAxis: [Double] = stride(from: 1.0, through: -4.0, by: -0.25).map { ($0 * 100).rounded() / 100 }
+    /// Defocus das distâncias de leitura usadas nas métricas.
+    public static let farDefocus = 0.0
+    public static let intermediateDefocus = -1.5   // 66 cm
+    public static let nearDefocus = -2.5           // 40 cm
+    /// Limites do eixo Y do gráfico (logMAR, invertido: menor é melhor).
+    public static let plotLogMARRange = -0.2...0.8
+
+    /// Refração efetiva usada no gráfico: residual previsto (ou o alvo, sem biometria) mais o
+    /// desvio da régua em relação ao alvo. Régua no alvo ⇒ refração prevista.
+    public static func effectiveResidual(predicted: Double?, target: Double, slider: Double) -> Double {
+        (predicted ?? target) + (slider - target)
+    }
+
+    /// AV binocular no defocus `d` a partir das monoculares disponíveis (uma só ⇒ ela mesma).
+    public static func binocularVA(_ a: Double?, _ b: Double?) -> Double? {
+        switch (a, b) {
+        case let (a?, b?): return binocularCombine(a, b)
+        case let (a?, nil): return a
+        case let (nil, b?): return b
+        default: return nil
+        }
+    }
 
     /// Amostra a curva em qualquer defocus `t` (interpolação linear; extrapolação linear limitada).
     public static func sampleCurve(_ values: [Double], at t: Double) -> Double {

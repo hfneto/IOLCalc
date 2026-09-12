@@ -88,6 +88,21 @@ struct PlanningTests {
         #expect(PowerPlanner.plan(eye: long, aConstant: 119.0).rows.map(\.formula).contains(.holladay1WK))
     }
 
+    @Test("Eixo do gráfico de defocus e refração efetiva da régua")
+    func defocusPlot() {
+        let x = DefocusModel.plotAxis
+        #expect(x.count == 21)
+        #expect(x.first == 1.0 && x.last == -4.0)
+        #expect(x.contains(-2.75))
+        // régua no alvo ⇒ residual previsto; arrastar ⇒ desvio do alvo
+        #expect(DefocusModel.effectiveResidual(predicted: -0.18, target: -0.5, slider: -0.5) == -0.18)
+        #expect(abs(DefocusModel.effectiveResidual(predicted: -0.18, target: -0.5, slider: -1.0) - (-0.68)) < 1e-12)
+        #expect(DefocusModel.effectiveResidual(predicted: nil, target: -0.5, slider: -0.25) == -0.25)
+        #expect(DefocusModel.binocularVA(0.1, nil) == 0.1)
+        #expect(DefocusModel.binocularVA(nil, nil) == nil)
+        #expect(DefocusModel.binocularVA(0.1, 0.1) == DefocusModel.binocularCombine(0.1, 0.1))
+    }
+
     /// Valores gerados pelo motor do `index.html` + regras do `recalc()` rodando no JavaScriptCore
     /// (Resources/planning.json): quatro olhos, incluindo curto com ΔA de contato e longo com alvo miópico.
     struct PlanningGolden: Decodable {
