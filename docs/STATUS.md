@@ -2,7 +2,7 @@
 
 Sessões: https://claude.ai/code/session_0153A2Tu3tz7zphMYzUt9NQP (Fase 0),
 https://claude.ai/code/session_01WvfqNJWEFnjbtQFmfWf4dC (Fases 3 a 5) e
-https://claude.ai/code/session_01MMnUxFEgepmGDGBTpAMtyy (Fase 6).
+https://claude.ai/code/session_01MMnUxFEgepmGDGBTpAMtyy (Fases 6 e 7).
 
 A Fase 6 foi feita direto em `main` (o worktree `worktree-biometria-swiftui` em
 `.claude/worktrees/biometria-swiftui` ficou parado no commit da Fase 5 e pode ser apagado:
@@ -34,22 +34,36 @@ A Fase 6 foi feita direto em `main` (o worktree `worktree-biometria-swiftui` em
     cilindro), contraste das difrativas, dia/noite e halos com 3 modos de variação individual.
   - `ToricTests` (362 casos + razões + Abulafia-Koch, gerados por `docs/toric-generator.js` no jsc)
     e `SimulationTests`. `IOLCore`: 21 testes passando (`cd IOLCore && swift test`).
+- **Fase 7:** relatório nativo e casos salvos.
+  - `ReportView.swift`: relatório em SwiftUI com o conteúdo do `generateReport()` da web; `ReportPDF`
+    gera PDF A4 paginado via `ImageRenderer.render` (uma passagem por página, com recorte e
+    deslocamento); impressão por PDFKit (Mac) / `UIPrintInteractionController` (iOS); `ShareLink`.
+    Rodapé agora diz "Calculadora de LIO" (sem o site, já antecipando a Fase 2).
+  - `CaseStore.swift` + `CasesSheet.swift`: `CaseSnapshot` (Codable) com biometria, lentes, alvos,
+    régua, astigmatismo, tórica, simulação e comparador; JSON em `Application Support/IOLCalc/`.
+    Botões "Relatório" e "Casos" na barra do paciente (`NativeCalculatorView.topBar`).
+  - Verificado por `-iol_report_pdf` (2 páginas A4 no caso de exemplo) e `-iol_cases_test` (OK).
 - Seletor "Página web / Nativo · beta" no topo (`RootView`); a página web continua completa.
 - Roadmap de saída do WordPress em `docs/ROADMAP.md`; canvas de design:
   https://claude.ai/code/artifact/53b9c69e-7379-446f-951d-d1488f7621e4
 
 ## Pendências do usuário
 1. Abrir o app, colar a chave da API (console.anthropic.com) e ler um laudo real na tela nativa.
-2. Testar a seção 7 num caso real com TK (deve mudar sozinha para "Total") e o arrasto no iPhone
-   (o gesto começa sem distância mínima; se atrapalhar a rolagem, aumentar `minimumDistance`).
+2. Testar no iPhone (instruções na conversa: simulador sem Apple ID; aparelho físico com Apple ID +
+   Team + Modo Desenvolvedor). Conferir o arrasto da seção 7 e o botão Imprimir do relatório.
+2b. Salvar um caso real, fechar e reabrir o app, abrir o caso pela lista "Casos".
 3. Fase 1 do roadmap: revogar a chave que estava no WordPress, desativar o plugin, avisar em /calculo.
 4. Apple ID no Xcode + Team no target para rodar no iPhone.
 5. Opcional: renomear `Auth.swift` → `APIKeyStore.swift` e `LoginView.swift` → `APIKeyView.swift`;
    apagar o worktree antigo (comando acima).
 
 ## Próximos passos sugeridos
-- Fase 7 (relatório nativo com `ImageRenderer`: já há tudo no `CalculatorModel`, inclusive o bloco
-  tórico por olho como no `torBlock` da web) e Fase 2 (origem própria) antes de remover o `index.html`.
+- Fase 2 (origem própria + migrar `localStorage`) e depois Fase 8 (remover o `index.html`); com isso o
+  seletor "Página web / Nativo" some e a tela nativa vira a única.
+- Casos salvos: sincronizar via iCloud Drive (basta trocar a URL do `CaseStore` para o container
+  ubíquo) se quiser os mesmos casos no Mac e no iPhone; exportar/importar um caso como arquivo.
+- Relatório: no PDF, o corte de página pode cair no meio de um bloco (é o `ImageRenderer` deslocado
+  por página). Se incomodar, renderizar as seções separadamente e paginar por bloco.
 - Seção 4 (calculadoras oficiais) na tela nativa: reaproveitar `CalculatorFillSheet` com os
   dados do `CalculatorModel`.
 - Ergonomia da seção 6 no iPhone: os quadros ficam em coluna única (300 pt mínimos); avaliar

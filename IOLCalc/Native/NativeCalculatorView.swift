@@ -5,11 +5,14 @@ import IOLCore
 /// calculando com o `IOLCore`. Substitui, aos poucos, a página web embutida.
 struct NativeCalculatorView: View {
     @State private var model = CalculatorModel()
+    @State private var store = CaseStore()
+    @State private var showReport = false
+    @State private var showCases = false
 
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                patientField
+                topBar
                 BiometrySection(model: model)
                 LensSection(model: model)
                 PowerSection(model: model)
@@ -28,6 +31,24 @@ struct NativeCalculatorView: View {
         #if os(iOS)
         .scrollDismissesKeyboard(.interactively)
         #endif
+        .sheet(isPresented: $showReport) { NativeReportSheet(model: model) }
+        .sheet(isPresented: $showCases) { CasesSheet(model: model, store: store) }
+    }
+
+    /// Paciente, relatório e casos salvos. No iPhone os botões descem para uma segunda linha.
+    private var topBar: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 10) { patientField; actions }
+            VStack(spacing: 8) { patientField; actions.frame(maxWidth: .infinity, alignment: .leading) }
+        }
+    }
+
+    private var actions: some View {
+        HStack(spacing: 8) {
+            PillButton(title: "Relatório", systemImage: "doc.text", primary: true) { showReport = true }
+            PillButton(title: store.contains(model.loadedCaseID) ? "Casos · aberto" : "Casos", systemImage: "tray.full") { showCases = true }
+        }
+        .fixedSize()
     }
 
     private var patientField: some View {

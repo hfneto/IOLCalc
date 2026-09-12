@@ -62,9 +62,12 @@ Planejamento tórico (SIA vetorial, Abulafia-Koch do artigo em `docs/`, Næser-S
 razão de toricidade pela ELP) em `IOLCore/Toric.swift` + `ToricSection`, com diagrama arrastável;
 simulação em quadros ampliados desenhada em `Canvas` (`SimulationSection`).
 
-## Fase 7 — Relatório nativo (1 sessão)
+## Fase 7 — Relatório nativo ✅ (12/09/2026)
 
-Relatório gerado em SwiftUI e exportado com `ImageRenderer` para PDF, impressão e `ShareLink`.
+Relatório em SwiftUI (`ReportView`), exportado com `ImageRenderer` para PDF A4 paginado
+(`ReportPDF`), impressão (PDFKit no Mac, `UIPrintInteractionController` no iPhone) e `ShareLink`.
+De quebra, **casos salvos** (`CaseStore`, `CasesSheet`): o planejamento inteiro (biometria, lentes,
+alvos, tórica, comparador) fica em `Application Support/IOLCalc/cases.json`.
 
 ## Fase 8 — Remover o `index.html` (meia sessão)
 

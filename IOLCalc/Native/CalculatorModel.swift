@@ -2,7 +2,7 @@ import Foundation
 import Observation
 import IOLCore
 
-enum Eye: String, CaseIterable, Identifiable {
+enum Eye: String, CaseIterable, Identifiable, Codable {
     case od = "OD"
     case oe = "OE"
 
@@ -11,7 +11,7 @@ enum Eye: String, CaseIterable, Identifiable {
 }
 
 /// Campos de um olho como digitados (texto), para aceitar vírgula ou ponto e campos vazios.
-struct EyeForm: Equatable {
+struct EyeForm: Equatable, Codable {
     var al = "", k1 = "", k2 = "", kAxis = "", acd = "", lt = "", wtw = "", cct = ""
     var tk1 = "", tk2 = "", tkAxis = ""
     var showTK = false
@@ -81,6 +81,8 @@ final class CalculatorModel {
     var compareEye: Eye = .od
     var compareA = ""
     var compareB = ""
+    /// Caso salvo de onde este estado veio (para "Atualizar"); `nil` = caso novo.
+    var loadedCaseID: UUID?
 
     private static let methodKey = "iol_method"
     private static func deltaKey(_ m: BiometryMethod) -> String { "iol_dA2_\(m.rawValue)" }
@@ -207,6 +209,35 @@ final class CalculatorModel {
         patientName = ""
         od.clearBiometry()
         oe.clearBiometry()
+        loadedCaseID = nil
+    }
+
+    // MARK: - Casos salvos
+
+    /// Tudo o que o usuário escolheu (biometria, lentes, alvos, régua, tórica, comparador), sem as
+    /// preferências globais (ΔA por método fica no UserDefaults).
+    func snapshot() -> CaseSnapshot {
+        CaseSnapshot(patientName: patientName, od: od, oe: oe, odToric: odToric, oeToric: oeToric, method: method,
+                     astigmatismOn: astigmatismOn, showMonocular: showMonocular, simulationNight: simulationNight,
+                     simulationHaloMode: simulationHaloMode, compareEye: compareEye, compareA: compareA, compareB: compareB)
+    }
+
+    func restore(_ c: CaseSnapshot, caseID: UUID?) {
+        patientName = c.patientName
+        od = c.od; oe = c.oe
+        odToric = c.odToric; oeToric = c.oeToric
+        method = c.method
+        astigmatismOn = c.astigmatismOn; showMonocular = c.showMonocular
+        simulationNight = c.simulationNight; simulationHaloMode = c.simulationHaloMode
+        compareEye = c.compareEye; compareA = c.compareA; compareB = c.compareB
+        loadedCaseID = caseID
+    }
+
+    /// Resumo curto de um olho para a lista de casos e o relatório: "PanOptix 21,0 D".
+    func summary(_ eye: Eye) -> String? {
+        guard let lens = self[eye].lens else { return nil }
+        if case .plan(let p) = result(for: eye) { return "\(lens.name) \(Num.fmt(p.chosen.power, 1)) D" }
+        return lens.name
     }
 
     /// Preenche a biometria com o que a IA leu (como `fillFromJSON` da web): só os campos
@@ -240,7 +271,7 @@ final class CalculatorModel {
 
 /// Planejamento tórico de um olho, como digitado. Os campos "override" ficam `nil` enquanto o
 /// usuário não os edita: até lá seguem a biometria da seção 1 (como os `dataset.touched` da web).
-struct ToricForm: Equatable {
+struct ToricForm: Equatable, Codable {
     var modelOverride: CornealAstigmatismModel?
     var k1Override: String?
     var k2Override: String?
@@ -256,8 +287,8 @@ struct ToricForm: Equatable {
     /// Razão digitada; vale enquanto a plataforma em vigor for a mesma.
     var ratioOverride: RatioChoice?
 
-    struct PlatformChoice: Equatable { var lensID: String; var id: String }
-    struct RatioChoice: Equatable { var platformID: String; var text: String }
+    struct PlatformChoice: Equatable, Codable { var lensID: String; var id: String }
+    struct RatioChoice: Equatable, Codable { var platformID: String; var text: String }
 
     init(siaAxis: String) { self.siaAxis = siaAxis }
 }

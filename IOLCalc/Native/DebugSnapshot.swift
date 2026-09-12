@@ -42,6 +42,22 @@ enum DebugSnapshot {
             model.fillSample()
             write(ToricSection(model: model), to: path)
         }
+        if let path = d.string(forKey: "iol_report_snapshot") {
+            let model = CalculatorModel()
+            model.fillSample()
+            model.astigmatismOn = true
+            let renderer = ImageRenderer(content: ReportView(model: model).frame(width: ReportPDF.pageSize.width - 2 * ReportPDF.margin))
+            renderer.scale = 2
+            if let img = renderer.nsImage, let tiff = img.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) {
+                try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+            }
+        }
+        if let path = d.string(forKey: "iol_report_pdf") {
+            let model = CalculatorModel()
+            model.fillSample()
+            model.astigmatismOn = true
+            try? ReportPDF.make(model: model).write(to: URL(fileURLWithPath: path))
+        }
         if let path = d.string(forKey: "iol_sim_snapshot") {
             let model = CalculatorModel()
             model.fillSample()
@@ -67,8 +83,42 @@ enum DebugSnapshot {
         try? summary.write(toFile: path + ".txt", atomically: true, encoding: .utf8)
     }
 
+    /// `-iol_cases_test <arquivo.txt>`: salva, atualiza, recarrega de um JSON temporário, abre e apaga um
+    /// caso; grava o resultado em texto ("OK" na última linha se tudo bateu).
+    @MainActor static func casesTestIfRequested() {
+        guard let out = UserDefaults.standard.string(forKey: "iol_cases_test") else { return }
+        var log: [String] = []
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("iol-cases-test-\(UUID().uuidString).json")
+        let store = CaseStore(fileURL: url)
+        let model = CalculatorModel()
+        model.fillSample()
+        let saved = store.saveNew(from: model)
+        log.append("saved id=\(saved.id) name=\(saved.name) od=\(saved.summaryOD ?? "-") oe=\(saved.summaryOE ?? "-")")
+        model.selectLens("vivity", for: .oe)
+        model[toric: .od].iolCylinder = "2,25"
+        model.patientName = "Maria da Silva (rev.)"
+        let updated = store.update(from: model)
+        log.append("updated same=\(updated.id == saved.id) name=\(updated.name) oe=\(updated.summaryOE ?? "-") count=\(store.cases.count)")
+        let store2 = CaseStore(fileURL: url)
+        let fresh = CalculatorModel()
+        var ok = store2.cases.count == 1
+        if let c = store2.cases.first {
+            store2.open(c, into: fresh)
+            ok = ok && fresh.oe.lensID == "vivity" && fresh[toric: .od].iolCylinder == "2,25" && fresh.patientName == "Maria da Silva (rev.)"
+                && fresh.od.al == "23,62" && fresh.loadedCaseID == c.id && fresh.snapshot() == model.snapshot()
+            log.append("reloaded lens=\(fresh.oe.lensID) cyl=\(fresh[toric: .od].iolCylinder) snapshotEqual=\(fresh.snapshot() == model.snapshot())")
+            store2.delete(c)
+        }
+        ok = ok && store2.cases.isEmpty && CaseStore(fileURL: url).cases.isEmpty
+        log.append("deleted count=\(CaseStore(fileURL: url).cases.count) file=\(url.path)")
+        log.append(ok ? "OK" : "FAIL")
+        try? FileManager.default.removeItem(at: url)
+        try? log.joined(separator: "\n").write(toFile: out, atomically: true, encoding: .utf8)
+    }
+
     @MainActor static func runIfRequested() {
         prepTestIfRequested()
+        casesTestIfRequested()
         renderChartIfRequested()
         renderSectionsIfRequested()
         guard let path = UserDefaults.standard.string(forKey: "iol_snapshot") else { return }
