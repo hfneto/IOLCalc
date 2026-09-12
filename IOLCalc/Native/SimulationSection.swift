@@ -10,7 +10,7 @@ struct SimulationSection: View {
 
     var body: some View {
         SectionCard(title: "6 · Simulação visual") {
-            MutedText("Duas cenas reais vistas do banco do motorista, cada uma com as três distâncias: o celular na mão (40 cm), o painel (75 cm) e a rua pelo para-brisa (longe). Cada camada é desfocada pela AV binocular prevista naquela distância (lentes + residual + astigmatismo, se ligado). À noite entram a penalidade mesópica e os halos nas luzes.", size: 12.5)
+            MutedText("Duas cenas reais com as três distâncias: de dia, numa cafeteria (celular na mão a 40 cm, e-mail no notebook a 66 cm, a rua e as lojas pela janela); à noite, dirigindo (celular na mão, GPS do carro a 66 cm, o carro à frente com a placa, faróis e luzes da cidade). Cada camada é desfocada pela AV binocular prevista naquela distância (lentes + residual + astigmatismo, se ligado). À noite entram a penalidade mesópica e os halos nas luzes.", size: 12.5)
             sceneBlock(.day)
             sceneBlock(.night)
             if anyEye {
@@ -19,7 +19,7 @@ struct SimulationSection: View {
                  + Text(" (classe das lentes). Use os botões da cena noturna para mostrar ao paciente a variação individual (\(VisualSimulation.haloModeLabels[model.simulationHaloMode])): alguns notam quase nada, a maioria nota halos ao dirigir, poucos têm queixa importante."))
                     .font(.system(size: 12)).foregroundStyle(Theme.muted)
             }
-            MutedText("Calibração: a AV prevista (logMAR) no defocus de cada distância vira um desfoque gaussiano com σ = 0,6·(MAR − 1) minutos de arco (MAR = 10^logMAR), a 2 px por minuto de arco. À noite soma-se +0,08 logMAR (mesópico); nas luzes, halos, anéis e starburst com intensidade pela classe da lente (difrativas = mais). As ópticas difrativas perdem ≈0,1–0,2 log de sensibilidade ao contraste, aplicado como redução de contraste. Fotos: Tim Foster, M. R. e personalgraphic.com (Unsplash).", size: 11.5)
+            MutedText("Calibração: a AV prevista (logMAR) no defocus de cada distância vira um desfoque gaussiano com σ = 0,6·(MAR − 1) minutos de arco (MAR = 10^logMAR), a 2 px por minuto de arco. À noite soma-se +0,08 logMAR (mesópico); nas luzes, halos, anéis e starburst com intensidade pela classe da lente (difrativas = mais). As ópticas difrativas perdem ≈0,1–0,2 log de sensibilidade ao contraste, aplicado como redução de contraste. Fotos: Blake Wisz (cafeteria), Selcuk Sarikoz (noite) e personalgraphic.com (mão), licença Unsplash.", size: 11.5)
         }
     }
 
@@ -46,7 +46,7 @@ struct SimulationSection: View {
             Text(scene.night ? "🌙 Noite" : "☀ Dia").font(.system(size: 12.5, weight: .bold)).foregroundStyle(Theme.ink)
             ForEach(Array(VisualSimulation.distances.enumerated()), id: \.offset) { i, d in
                 HStack(spacing: 4) {
-                    Text(d.label).font(.system(size: 11.5)).foregroundStyle(Theme.muted)
+                    Text(d.id == "mid" ? (scene.night ? "GPS · 66 cm" : "Notebook · 66 cm") : d.label).font(.system(size: 11.5)).foregroundStyle(Theme.muted)
                     Text(acuities[i].map { DefocusModel.snellen(fromLogMAR: $0) } ?? "—")
                         .font(.system(size: 12.5, weight: .heavy))
                         .foregroundStyle(acuities[i].map { $0 <= 0.2 ? ToricDiagram.green : ($0 <= 0.4 ? Theme.warn : Theme.od) } ?? Theme.muted)
@@ -77,32 +77,49 @@ struct SimulationScene {
         let color: Color
     }
 
+    /// Tela a 66 cm desenhada sobre a foto: e-mail no notebook (quadrilátero, transformação afim
+    /// pelos cantos superior-esquerdo, superior-direito e inferior-esquerdo) ou GPS do carro (retângulo).
+    enum MidScreen {
+        case laptop(topLeft: CGPoint, topRight: CGPoint, bottomLeft: CGPoint)
+        case navigation(CGRect)
+    }
+
     let imageName: String
     let night: Bool
     let farPolygons: [[CGPoint]]
     let lights: [Light]
+    /// Onde a mão com o celular entra (px de cena 1120 × 720; a foto da mão tem 900 × 1240).
+    let phoneRect: CGRect
+    let midScreen: MidScreen
 
     static let day = SimulationScene(
         imageName: "sim-day", night: false,
         farPolygons: [
-            [(0.16, 0.0), (0.76, 0.0), (0.83, 0.20), (0.86, 0.27), (1.0, 0.31), (1.0, 0.56), (0.72, 0.585), (0.55, 0.59), (0.31, 0.60),
-             (0.27, 0.50), (0.21, 0.30), (0.21, 0.12)].map { CGPoint(x: $0.0, y: $0.1) },
-            [(0.0, 0.42), (0.06, 0.36), (0.13, 0.40), (0.13, 0.53), (0.0, 0.56)].map { CGPoint(x: $0.0, y: $0.1) },
+            [(0.17, 0.0), (1.0, 0.0), (1.0, 0.60), (0.92, 0.62), (0.62, 0.63), (0.40, 0.62), (0.20, 0.60), (0.17, 0.55)].map { CGPoint(x: $0.0, y: $0.1) },
         ],
-        lights: [])
+        lights: [],
+        phoneRect: CGRect(x: 30, y: 300, width: 330, height: 455),
+        midScreen: .laptop(topLeft: CGPoint(x: 0.628, y: 0.556), topRight: CGPoint(x: 0.914, y: 0.583), bottomLeft: CGPoint(x: 0.622, y: 0.806)))
 
     static let night = SimulationScene(
         imageName: "sim-night", night: true,
         farPolygons: [
-            [(0.13, 0.0), (1.0, 0.0), (1.0, 0.53), (0.78, 0.56), (0.55, 0.53), (0.30, 0.51), (0.20, 0.47), (0.13, 0.42)].map { CGPoint(x: $0.0, y: $0.1) },
+            [(0.32, 0.22), (0.60, 0.17), (0.99, 0.17), (1.0, 0.62), (0.62, 0.62), (0.45, 0.60), (0.33, 0.50), (0.30, 0.35)].map { CGPoint(x: $0.0, y: $0.1) },
         ],
         lights: [
-            Light(x: 0.473, y: 0.260, radius: 0.012, strength: 0.9, color: Color(red: 1, green: 0.85, blue: 0.55)),
-            Light(x: 0.540, y: 0.300, radius: 0.006, strength: 0.8, color: Color(red: 1, green: 0.95, blue: 0.8)),
-            Light(x: 0.575, y: 0.292, radius: 0.006, strength: 0.8, color: Color(red: 1, green: 0.95, blue: 0.8)),
-            Light(x: 0.688, y: 0.343, radius: 0.005, strength: 0.9, color: Color(red: 1, green: 0.3, blue: 0.25)),
-            Light(x: 0.704, y: 0.343, radius: 0.005, strength: 0.9, color: Color(red: 1, green: 0.3, blue: 0.25)),
-        ])
+            // faróis dos carros que vêm de frente
+            Light(x: 0.458, y: 0.568, radius: 0.017, strength: 1.2, color: Color(red: 1, green: 0.97, blue: 0.9)),
+            Light(x: 0.506, y: 0.541, radius: 0.016, strength: 1.1, color: Color(red: 1, green: 0.97, blue: 0.9)),
+            Light(x: 0.411, y: 0.559, radius: 0.013, strength: 1.0, color: Color(red: 1, green: 0.97, blue: 0.9)),
+            Light(x: 0.516, y: 0.487, radius: 0.011, strength: 0.8, color: Color(red: 1, green: 0.97, blue: 0.9)),
+            Light(x: 0.532, y: 0.523, radius: 0.010, strength: 0.8, color: Color(red: 1, green: 0.97, blue: 0.9)),
+            // carro à frente: lanternas e luz de freio
+            Light(x: 0.654, y: 0.557, radius: 0.016, strength: 1.0, color: Color(red: 1, green: 0.85, blue: 0.5)),
+            Light(x: 0.922, y: 0.558, radius: 0.010, strength: 0.9, color: Color(red: 1, green: 0.8, blue: 0.5)),
+            Light(x: 0.780, y: 0.439, radius: 0.012, strength: 0.9, color: Color(red: 1, green: 0.35, blue: 0.25)),
+        ],
+        phoneRect: CGRect(x: 840, y: 348, width: 270, height: 372),
+        midScreen: .navigation(CGRect(x: 0.60, y: 0.74, width: 0.145, height: 0.13)))
 
     /// Caminho dos polígonos "longe" em px de cena.
     func farPath(width W: Double, height H: Double) -> Path {
@@ -129,8 +146,7 @@ struct SimulationSceneView: View {
 
     private let W = VisualSimulation.sceneWidth
     private let H = VisualSimulation.sceneHeight
-    /// Onde a mão com o celular entra (px de cena) — a foto tem 900 × 1240.
-    private let phoneRect = CGRect(x: 745, y: 292, width: 345, height: 475)
+    private var phoneRect: CGRect { scene.phoneRect }
     /// Tela do celular, normalizada à foto da mão (com cantos arredondados).
     private let screenRect = CGRect(x: 0.37, y: 0.09, width: 0.55, height: 0.845)
 
@@ -210,10 +226,80 @@ struct SimulationSceneView: View {
             l.draw(photo, in: full)
         }
         ctx.drawLayer { l in
+            if sigma.mid > 0.3 { l.addFilter(.blur(radius: sigma.mid)) }
+            l.scaleBy(x: s, y: s)
+            drawMidScreen(&l)
+        }
+        ctx.drawLayer { l in
             if sigma.near > 0.3 { l.addFilter(.blur(radius: sigma.near)) }
             l.scaleBy(x: s, y: s)
             l.draw(hand, in: phoneRect)
             drawPhoneScreen(&l)
+        }
+    }
+
+    /// Tela a 66 cm: e-mail no notebook (dia) ou GPS no painel (noite). Texto maior que o físico
+    /// (as fotos têm campo largo, o real seria ilegível) mas em proporção entre as distâncias.
+    private func drawMidScreen(_ c: inout GraphicsContext) {
+        switch scene.midScreen {
+        case .laptop(let tl, let tr, let bl):
+            // transformação afim: unidade → quadrilátero da tela (px de cena)
+            let o = CGPoint(x: tl.x * W, y: tl.y * H)
+            let ax = CGPoint(x: (tr.x - tl.x) * W, y: (tr.y - tl.y) * H)
+            let ay = CGPoint(x: (bl.x - tl.x) * W, y: (bl.y - tl.y) * H)
+            let sw = hypot(ax.x, ax.y), sh = hypot(ay.x, ay.y)
+            c.concatenate(CGAffineTransform(a: ax.x / sw, b: ax.y / sw, c: ay.x / sh, d: ay.y / sh, tx: o.x, ty: o.y))
+            let r = CGRect(x: 0, y: 0, width: sw, height: sh)
+            c.clip(to: Path(r))
+            c.fill(Path(r), with: .color(Color(hex: 0xf3f4f6)))
+            let fs = sw * 0.045
+            // barra de janela + cabeçalho do e-mail
+            c.fill(Path(CGRect(x: 0, y: 0, width: sw, height: fs * 1.6)), with: .color(Color(hex: 0xe5e7eb)))
+            for (i, col) in [Color(hex: 0xff5f57), Color(hex: 0xfebc2e), Color(hex: 0x28c840)].enumerated() {
+                c.fill(Path(ellipseIn: CGRect(x: fs * (0.6 + Double(i) * 0.9), y: fs * 0.5, width: fs * 0.6, height: fs * 0.6)), with: .color(col))
+            }
+            let body = CGRect(x: fs * 0.8, y: fs * 2.3, width: sw - fs * 1.6, height: sh - fs * 3)
+            c.fill(Path(roundedRect: body, cornerRadius: fs * 0.4), with: .color(.white))
+            var y = body.minY + fs * 0.7
+            func line(_ t: String, _ size: Double, weight: Font.Weight = .regular, color: Color = Color(hex: 0x1f2937)) {
+                c.draw(c.resolve(Text(t).font(.system(size: size, weight: weight)).foregroundColor(color)), at: CGPoint(x: body.minX + fs * 0.8, y: y), anchor: .topLeading)
+                y += size * 1.45
+            }
+            line("Confirmação da cirurgia", fs * 1.25, weight: .bold)
+            line("Clínica Dr. Hallim · para: Maria", fs * 0.85, color: Color(hex: 0x6b7280))
+            y += fs * 0.5
+            line("Prezada Maria,", fs)
+            line("confirmamos a sua cirurgia para", fs)
+            line("quinta, dia 24, às 7h. Chegar em", fs)
+            line("jejum de 8 horas.", fs)
+            y += fs * 0.4
+            line("Atenciosamente,", fs)
+            line("Equipe Dr. Hallim", fs, weight: .semibold)
+        case .navigation(let nr):
+            let r = CGRect(x: nr.minX * W, y: nr.minY * H, width: nr.width * W, height: nr.height * H)
+            c.clip(to: Path(roundedRect: r, cornerRadius: r.width * 0.03))
+            // mapa escuro com a rota
+            c.fill(Path(r), with: .color(Color(hex: 0x1f2937)))
+            var road = Path()
+            road.move(to: CGPoint(x: r.minX + r.width * 0.55, y: r.maxY)); road.addLine(to: CGPoint(x: r.minX + r.width * 0.55, y: r.minY + r.height * 0.55)); road.addLine(to: CGPoint(x: r.minX + r.width * 0.2, y: r.minY + r.height * 0.55))
+            c.stroke(road, with: .color(Color(hex: 0x374151)), lineWidth: r.width * 0.09)
+            c.stroke(road, with: .color(Color(hex: 0x3b82f6)), style: StrokeStyle(lineWidth: r.width * 0.045, lineCap: .round, lineJoin: .round))
+            var minor = Path()
+            minor.move(to: CGPoint(x: r.minX, y: r.minY + r.height * 0.8)); minor.addLine(to: CGPoint(x: r.maxX, y: r.minY + r.height * 0.8))
+            minor.move(to: CGPoint(x: r.minX + r.width * 0.8, y: r.minY)); minor.addLine(to: CGPoint(x: r.minX + r.width * 0.8, y: r.maxY))
+            c.stroke(minor, with: .color(Color(hex: 0x374151)), lineWidth: r.width * 0.04)
+            // painel de instrução
+            let bh = r.height * 0.36
+            c.fill(Path(CGRect(x: r.minX, y: r.minY, width: r.width, height: bh)), with: .color(Color(hex: 0x15803d)))
+            let fs = r.width * 0.11
+            let ax = r.minX + fs * 0.4, ay = r.minY + bh / 2
+            var arrow = Path()
+            arrow.move(to: CGPoint(x: ax + fs * 0.75, y: ay + fs * 0.55)); arrow.addLine(to: CGPoint(x: ax + fs * 0.75, y: ay - fs * 0.15)); arrow.addLine(to: CGPoint(x: ax + fs * 0.1, y: ay - fs * 0.15))
+            arrow.move(to: CGPoint(x: ax + fs * 0.42, y: ay - fs * 0.5)); arrow.addLine(to: CGPoint(x: ax + fs * 0.05, y: ay - fs * 0.15)); arrow.addLine(to: CGPoint(x: ax + fs * 0.42, y: ay + fs * 0.2))
+            c.stroke(arrow, with: .color(.white), style: StrokeStyle(lineWidth: fs * 0.16, lineCap: .round, lineJoin: .round))
+            c.draw(c.resolve(Text("300 m").font(.system(size: fs, weight: .bold)).foregroundColor(.white)), at: CGPoint(x: ax + fs * 1.1, y: ay - fs * 0.25), anchor: .leading)
+            c.draw(c.resolve(Text("Av. Paulista").font(.system(size: fs * 0.62)).foregroundColor(.white)), at: CGPoint(x: ax + fs * 1.1, y: ay + fs * 0.45), anchor: .leading)
+            c.draw(c.resolve(Text("12 min · 4,8 km").font(.system(size: fs * 0.7, weight: .bold)).foregroundColor(Color(hex: 0xe5e7eb))), at: CGPoint(x: r.maxX - fs * 0.4, y: r.maxY - fs * 0.35), anchor: .bottomTrailing)
         }
     }
 

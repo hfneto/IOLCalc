@@ -28,10 +28,10 @@ public enum VisualSimulation {
         public let defocus: Double
     }
 
-    /// As três camadas das cenas: celular na mão, painel do carro e a rua pelo para-brisa.
+    /// As três camadas das cenas: celular na mão, tela a 66 cm (notebook de dia, GPS à noite) e a rua.
     public static let distances: [Distance] = [
         Distance(id: "near", label: "Celular · 40 cm", distanceCm: 40, defocus: -2.5),
-        Distance(id: "mid", label: "Painel · 75 cm", distanceCm: 75, defocus: -1.33),
+        Distance(id: "mid", label: "66 cm", distanceCm: 66, defocus: -1.5),
         Distance(id: "far", label: "Rua · longe", distanceCm: 5000, defocus: 0),
     ]
 

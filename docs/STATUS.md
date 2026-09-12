@@ -30,11 +30,15 @@ A Fase 6 foi feita direto em `main` (o worktree `worktree-biometria-swiftui` em
     "sugerir ideal", "alinhar ao astig.", copiar OD↔OE, diagrama em `Canvas` com arrasto do eixo da
     LIO e da incisão, métricas e nota de desalinhamento.
   - `SimulationSection.swift` (refeita em 12/09 à tarde a pedido do usuário — "as simulações são muito
-    ruins, precisamos de imagens realistas"): duas cenas fotográficas (dia e noite, Unsplash) com as
-    três distâncias em camadas (celular na mão a 40 cm, painel a 75 cm, rua pelo vidro), cada camada
-    desfocada pela AV da sua distância; astigmatismo por média aditiva de 8 cópias (com "over" a
-    cobertura ficava em 66 % e o fundo vazava como névoa); halos/anéis/starburst só nas luzes
-    marcadas (o brilho por filtro `luminanceToAlpha` clareava o céu inteiro e foi removido).
+    ruins, precisamos de imagens realistas", depois "cafeteria de dia; direção em 1ª pessoa à noite
+    com carro à frente, placa, semáforo, GPS e celular na mão"): duas cenas fotográficas (Unsplash) com
+    as três distâncias em camadas — dia: cafeteria (celular na mão 40 cm, e-mail no notebook 66 cm,
+    rua pela janela); noite: dirigindo (celular, GPS no painel 66 cm, carro à frente com placa, luzes).
+    Cada camada desfocada pela AV da sua distância; astigmatismo por média aditiva de 8 cópias (com
+    "over" a cobertura ficava em 66 % e o fundo vazava como névoa); halos/anéis/starburst só nas
+    luzes marcadas (o brilho por filtro `luminanceToAlpha` clareava o céu inteiro e foi removido).
+    Ferramentas usadas (no scratchpad da sessão, não versionadas): folha de contato das buscas do
+    Unsplash e `tools.swift` (recorte da mão com Vision, detecção de luzes, prévia de máscaras).
   - `ToricTests` (362 casos + razões + Abulafia-Koch, gerados por `docs/toric-generator.js` no jsc)
     e `SimulationTests`. `IOLCore`: 21 testes passando (`cd IOLCore && swift test`).
 - **Fase 7:** relatório nativo e casos salvos.

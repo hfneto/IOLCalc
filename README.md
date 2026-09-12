@@ -93,12 +93,13 @@ seção 7 (planejamento tórico com diagrama arrastável), todas calculando com 
   serializam `EyeForm`/`ToricForm` e as escolhas; a lista fica em
   `Application Support/IOLCalc/cases.json` no container do app. "Salvar caso atual", "Atualizar" (quando
   o estado veio de um caso), "Salvar como novo", abrir, renomear e apagar. "Limpar" começa um caso novo.
-- `SimulationSection` mostra duas cenas fotográficas do banco do motorista (dia e noite), cada uma
-  com as três distâncias em camadas: a foto inteira desfocada pela AV a 75 cm (painel), o que se vê
-  pelo vidro (polígonos em `SimulationScene.farPolygons`) desfocado pela AV de longe, e a mão com o
-  celular (PNG com transparência, mensagem desenhada na tela) desfocada pela AV a 40 cm. Desfoque
-  gaussiano a 2 px/′ (a ampliação das fotos é menor que a real), arrasto do astigmatismo por média
-  aditiva de 8 cópias, perda de contraste das difrativas e, à noite, halos/anéis/starburst nas luzes
-  marcadas em `SimulationScene.night.lights`. Fotos (licença Unsplash): Tim Foster (dia), M. R.
-  (noite) e personalgraphic.com (mão); a mão foi recortada com o Vision (subject lifting). Os
+- `SimulationSection` mostra duas cenas fotográficas com as três distâncias em camadas. De dia, uma
+  cafeteria: celular na mão (PNG com transparência, mensagem desenhada na tela, 40 cm), e-mail
+  desenhado na tela do notebook (transformação afim pelos cantos da tela, 66 cm) e a rua com carros e
+  lojas pela janela (polígono `farPolygons`, longe). À noite, dirigindo: celular na mão, GPS desenhado
+  no painel (66 cm), carro à frente com a placa, faróis e luzes da cidade (longe), com halos/anéis/
+  starburst nas luzes marcadas em `SimulationScene.night.lights`. Cada camada é desfocada pela AV da
+  sua distância (gaussiano a 2 px/′; a ampliação das fotos é menor que a real), astigmatismo por média
+  aditiva de 8 cópias, perda de contraste das difrativas. Fotos (licença Unsplash): Blake Wisz
+  (cafeteria), Selcuk Sarikoz (noite) e personalgraphic.com (mão, recortada com o Vision). Os
   arquivos estão em `Assets.xcassets` (`sim-day`, `sim-night`, `sim-hand`).
