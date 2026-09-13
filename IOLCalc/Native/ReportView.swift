@@ -310,7 +310,7 @@ struct NativeReportSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
+            ScrollView([.horizontal, .vertical]) {
                 ReportView(model: model, date: date)
                     .frame(width: ReportPDF.pageSize.width - 2 * ReportPDF.margin)
                     .clipShape(RoundedRectangle(cornerRadius: 6))

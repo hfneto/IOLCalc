@@ -97,7 +97,7 @@ struct AIReadControls: View {
                         Picker("", selection: $reader.model) {
                             ForEach(AIReaderState.models, id: \.id) { Text($0.title).tag($0.id) }
                         }
-                        .labelsHidden().fixedSize()
+                        .labelsHidden().compactFixedSize()
                     }
                     MutedText(reader.hasKey ? "chave da API configurada · leitura por IA ativa" : "sem chave da API · leitura por IA desativada")
                         .padding(.bottom, 8)

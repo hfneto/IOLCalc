@@ -8,7 +8,7 @@ struct ToricSection: View {
 
     var body: some View {
         SectionCard(title: "7 · Planejamento de LIO tórica — ambos os olhos", trailing: AnyView(
-            HStack(spacing: 8) {
+            FlowLayout(spacing: 8) {
                 PillButton(title: "copiar OD → OE") { model.copyToric(from: .od, to: .oe) }
                 PillButton(title: "copiar OE → OD") { model.copyToric(from: .oe, to: .od) }
                 Link(destination: URL(string: "https://calc.apacrs.org/toric_calculator20/Toric%20Calculator.aspx")!) {
@@ -47,7 +47,7 @@ private struct ToricCard: View {
                 Picker("", selection: Binding(get: { cornealModel }, set: { model[toric: eye].modelOverride = $0 })) {
                     ForEach(CornealAstigmatismModel.allCases) { Text($0.title).tag($0) }
                 }
-                .labelsHidden().fixedSize()
+                .labelsHidden().compactFixedSize()
             }
             if let note = cornealModel.note { MutedText(note, size: 11) }
             if cornealModel == .total {
@@ -69,13 +69,13 @@ private struct ToricCard: View {
                 NumberField(label: "Eixo da LIO (°)", text: field(\.iolAxis))
             }
             DisclosureGroup(isExpanded: $showAdvanced) {
-                HStack(alignment: .top, spacing: 8) {
+                AdaptiveHStack(alignment: .top, spacing: 8) {
                     VStack(alignment: .leading, spacing: 3) {
                         FieldLabel(text: "Plataforma")
                         Picker("", selection: Binding(get: { model.toricPlatformID(eye) }, set: { model.setToricPlatform($0, for: eye) })) {
                             ForEach(ToricPlatform.all) { Text($0.name).tag($0.id) }
                         }
-                        .labelsHidden().fixedSize()
+                        .labelsHidden().compactFixedSize()
                     }
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 4) {
@@ -89,7 +89,6 @@ private struct ToricCard: View {
                             .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.line))
                             .frame(maxWidth: 120)
                     }
-                    Spacer()
                 }
                 .padding(.top, 6)
             } label: {
@@ -97,10 +96,9 @@ private struct ToricCard: View {
             }
             .tint(Theme.muted)
 
-            HStack(spacing: 8) {
+            FlowLayout(spacing: 8) {
                 PillButton(title: "✨ sugerir ideal", primary: true) { model.suggestToric(eye) }
                 PillButton(title: "alinhar ao astig.") { model.alignToricToTotal(eye) }
-                Spacer()
             }
 
             ToricDiagram(plan: plan) { target, angle in

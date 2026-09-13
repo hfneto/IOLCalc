@@ -72,6 +72,15 @@ Diagnóstico feito com capturas da janela ao vivo (`screencapture -l <CGWindowID
 `cacheDisplay` não mostravam o problema porque desenham por outro caminho). Se um dia quiser modo
 escuro de verdade, é preciso uma paleta escura no `Theme`, não só tirar essa linha.
 
+## Layout de iPhone (12/09, noite)
+O usuário rodou no iPhone e a tela só cabia na horizontal. Causa: cabeçalhos com controles de largura
+fixa (`fixedSize`), linhas de botões em `HStack` e margens de 32 pt. Correção: ambiente
+`isCompactWidth` (`CompactWidthProvider` no `RootView`, lê o size class do iOS; `-iol_force_compact`
+no Mac), `SectionCard` põe o "trailing" abaixo do título, `FlowLayout` para linhas de botões/toggles,
+`AdaptiveHStack` e `.compactFixedSize()` nos seletores, tabela da seção 3 rolável na horizontal,
+margens de 12 pt. `EyePair`/`EyePairLike` passaram a usar o mesmo ambiente. Conferido no simulador
+(iPhone 17) e no render `-iol_phone_snapshot`.
+
 ## Pendências do usuário
 1. Abrir o app, colar a chave da API (console.anthropic.com) e ler um laudo real na tela nativa.
 2. Testar no iPhone (instruções na conversa: simulador sem Apple ID; aparelho físico com Apple ID +

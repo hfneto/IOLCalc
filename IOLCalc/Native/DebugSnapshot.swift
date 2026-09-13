@@ -42,6 +42,19 @@ enum DebugSnapshot {
             model.fillSample()
             write(ToricSection(model: model), to: path)
         }
+        if let path = d.string(forKey: "iol_phone_snapshot") {
+            // tela inteira na largura de iPhone (390 pt); use com `-iol_force_compact YES -iol_sample YES`
+            let model = CalculatorModel()
+            model.fillSample()
+            let page = CalculatorPage(model: model, store: CaseStore(fileURL: FileManager.default.temporaryDirectory.appendingPathComponent("phone-snapshot-cases.json")),
+                                      showReport: .constant(false), showCases: .constant(false))
+            let renderer = ImageRenderer(content: CompactWidthProvider { page }.frame(width: 390).background(Theme.bg))
+            renderer.scale = 1.5 // a página inteira é muito alta para passar por TIFF em 2×
+            if let cg = renderer.cgImage, let dest = CGImageDestinationCreateWithURL(URL(fileURLWithPath: path) as CFURL, UTType.png.identifier as CFString, 1, nil) {
+                CGImageDestinationAddImage(dest, cg, nil)
+                CGImageDestinationFinalize(dest)
+            }
+        }
         if let path = d.string(forKey: "iol_calcs_snapshot") {
             let model = CalculatorModel()
             model.fillSample()

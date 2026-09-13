@@ -54,7 +54,7 @@ struct CasesSheet: View {
 
     private var saveBar: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
+            FlowLayout(spacing: 8) {
                 if let loaded {
                     PillButton(title: "Atualizar “\(loaded.name)”", systemImage: "arrow.triangle.2.circlepath", primary: true) {
                         store.update(from: model); show("Caso atualizado")
@@ -67,7 +67,6 @@ struct CasesSheet: View {
                         store.saveNew(from: model); show("Caso salvo")
                     }
                 }
-                Spacer()
                 if let flash { Text(flash).font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.okInk) }
             }
             MutedText("O caso guarda biometria, lentes, alvos, régua, astigmatismo, planejamento tórico e comparador. O nome é o do paciente; renomeie pelo menu do caso.", size: 11.5)

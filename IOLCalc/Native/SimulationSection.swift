@@ -52,7 +52,7 @@ struct SimulationSection: View {
     }
 
     private func header(_ scene: SimulationScene, _ acuities: [Double?]) -> some View {
-        HStack(spacing: 10) {
+        FlowLayout(spacing: 10) {
             Text(scene.night ? "🌙 Noite" : "☀ Dia").font(.system(size: 12.5, weight: .bold)).foregroundStyle(Theme.ink)
             ForEach(Array(VisualSimulation.distances.enumerated()), id: \.offset) { i, d in
                 HStack(spacing: 4) {
@@ -63,7 +63,6 @@ struct SimulationSection: View {
                 }
             }
         }
-        .fixedSize()
     }
 
     private var haloPicker: some View {

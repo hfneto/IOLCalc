@@ -11,22 +11,7 @@ struct NativeCalculatorView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
-                topBar
-                BiometrySection(model: model)
-                LensSection(model: model)
-                PowerSection(model: model)
-                CalculatorsSection(model: model)
-                DefocusSection(model: model)
-                CompareDrawer(model: model)
-                SimulationSection(model: model)
-                ToricSection(model: model)
-                MutedText("Recomendação por AL: olho curto (<22 mm) → Hoffer Q / Haigis / Castrop · médio → todas · longo (>26 mm) → Holladay 1 com ajuste Wang-Koch / T2 / Haigis / Castrop. A sugestão é a mediana das fórmulas recomendadas.", size: 11.5)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .padding(EdgeInsets(top: 24, leading: 32, bottom: 24, trailing: 32))
-            .frame(maxWidth: 1200)
-            .frame(maxWidth: .infinity)
+            CalculatorPage(model: model, store: store, showReport: $showReport, showCases: $showCases)
         }
         .background(Theme.bg)
         #if os(iOS)
@@ -34,6 +19,34 @@ struct NativeCalculatorView: View {
         #endif
         .sheet(isPresented: $showReport) { NativeReportSheet(model: model) }
         .sheet(isPresented: $showCases) { CasesSheet(model: model, store: store) }
+    }
+}
+
+/// O conteúdo da página (fora do `ScrollView`, para o `ImageRenderer` de depuração conseguir desenhá-lo).
+struct CalculatorPage: View {
+    @Bindable var model: CalculatorModel
+    let store: CaseStore
+    @Binding var showReport: Bool
+    @Binding var showCases: Bool
+    @Environment(\.isCompactWidth) private var compact
+
+    var body: some View {
+        VStack(spacing: 16) {
+            topBar
+            BiometrySection(model: model)
+            LensSection(model: model)
+            PowerSection(model: model)
+            CalculatorsSection(model: model)
+            DefocusSection(model: model)
+            CompareDrawer(model: model)
+            SimulationSection(model: model)
+            ToricSection(model: model)
+            MutedText("Recomendação por AL: olho curto (<22 mm) → Hoffer Q / Haigis / Castrop · médio → todas · longo (>26 mm) → Holladay 1 com ajuste Wang-Koch / T2 / Haigis / Castrop. A sugestão é a mediana das fórmulas recomendadas.", size: 11.5)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(EdgeInsets(top: compact ? 12 : 24, leading: compact ? 12 : 32, bottom: 24, trailing: compact ? 12 : 32))
+        .frame(maxWidth: 1200)
+        .frame(maxWidth: .infinity)
     }
 
     /// Paciente, relatório e casos salvos. No iPhone os botões descem para uma segunda linha.
@@ -138,11 +151,10 @@ struct LensSection: View {
         SectionCard(title: "2 · Lentes e alvo", trailing: AnyView(methodPicker)) {
             DisclosureGroup(isExpanded: $showAdvanced) {
                 VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 8) {
+                    FlowLayout(spacing: 8) {
                         ForEach(BiometryMethod.allCases) { m in
-                            NumberField(label: "ΔA \(m.shortLabel)", text: deltaBinding(m)).frame(maxWidth: 130)
+                            NumberField(label: "ΔA \(m.shortLabel)", text: deltaBinding(m)).frame(width: 120)
                         }
-                        Spacer()
                     }
                     MutedText("As constantes do catálogo são as de biometria óptica (IOLcon/ULIB). Com AL de imersão a constante deve cair ≈0,23 (Shammas 2021). A aplanação comprime a córnea e encurta o AL em 0,14–0,28 mm; A óptica = A contato + 3·ΔAL (Hill) dá ≈−0,50 para 0,17 mm. Se tiver a constante otimizada do seu aparelho, use-a aqui.", size: 11.5)
                 }
@@ -156,11 +168,10 @@ struct LensSection: View {
                 LensCard(eye: eye, model: model)
             }
 
-            HStack(spacing: 14) {
+            FlowLayout(spacing: 14) {
                 Toggle("calcular OD", isOn: $model.od.enabled)
                 Toggle("calcular OE", isOn: $model.oe.enabled)
                 PillButton(title: "copiar OD → OE") { model.copyODtoOE() }
-                Spacer()
             }
             #if os(macOS)
             .toggleStyle(.checkbox)
@@ -178,7 +189,7 @@ struct LensSection: View {
                 ForEach(BiometryMethod.allCases) { Text($0.title).tag($0) }
             }
             .labelsHidden()
-            .fixedSize()
+            .compactFixedSize()
             Chip(text: "ΔA " + Num.fmt(model.currentDeltaA, signed: true))
         }
     }
@@ -253,8 +264,10 @@ private struct PowerPlanView: View {
         return s + " · alvo \(Num.fmt(plan.target)) D"
     }
 
+    @Environment(\.isCompactWidth) private var compact
+
     private var suggestion: some View {
-        HStack(spacing: 12) {
+        AdaptiveHStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("SUGESTÃO").font(.system(size: 11, weight: .bold)).kerning(0.3)
                 Text("\(Num.fmt(plan.chosen.power, 1)) D").font(.system(size: 30, weight: .heavy))
@@ -276,7 +289,7 @@ private struct PowerPlanView: View {
                     Text("residual \(Num.fmt(alt.residual, signed: true)) D").font(.system(size: 12)).foregroundStyle(Theme.muted)
                 }
                 .padding(12)
-                .frame(width: 150, alignment: .leading)
+                .frame(maxWidth: compact ? .infinity : 150, alignment: .leading)
                 .frame(maxHeight: .infinity)
                 .background(Color.white)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
@@ -291,6 +304,12 @@ private struct PowerPlanView: View {
     }
 
     private var table: some View {
+        Group {
+            if compact { ScrollView(.horizontal, showsIndicators: false) { grid.fixedSize(horizontal: true, vertical: false) } } else { grid }
+        }
+    }
+
+    private var grid: some View {
         Grid(horizontalSpacing: 0, verticalSpacing: 0) {
             GridRow {
                 head("Fórmula", leading: true)

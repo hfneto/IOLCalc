@@ -32,6 +32,58 @@ extension Color {
     }
 }
 
+// MARK: - Largura compacta (iPhone na vertical)
+
+/// `true` quando a largura é compacta (iPhone em pé). No macOS é sempre `false`; em DEBUG o
+/// argumento `-iol_force_compact YES` força `true` para renderizar o layout de iPhone no Mac.
+struct CompactWidthKey: EnvironmentKey { static let defaultValue = false }
+
+extension EnvironmentValues {
+    var isCompactWidth: Bool {
+        get { self[CompactWidthKey.self] }
+        set { self[CompactWidthKey.self] = newValue }
+    }
+}
+
+/// Lê o size class da plataforma e publica `isCompactWidth` para toda a subárvore.
+struct CompactWidthProvider<Content: View>: View {
+    @ViewBuilder let content: Content
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    private var compact: Bool { sizeClass == .compact }
+    #else
+    private var compact: Bool {
+        #if DEBUG
+        UserDefaults.standard.bool(forKey: "iol_force_compact")
+        #else
+        false
+        #endif
+    }
+    #endif
+    var body: some View { content.environment(\.isCompactWidth, compact) }
+}
+
+/// Largura fixa (tamanho ideal) só quando há espaço; na largura compacta o controle pode encolher.
+struct CompactFixedSize: ViewModifier {
+    @Environment(\.isCompactWidth) private var compact
+    func body(content: Content) -> some View { content.fixedSize(horizontal: !compact, vertical: false) }
+}
+
+extension View {
+    func compactFixedSize() -> some View { modifier(CompactFixedSize()) }
+}
+
+/// HStack com espaço; VStack alinhada à esquerda na largura compacta.
+struct AdaptiveHStack<Content: View>: View {
+    var alignment: VerticalAlignment = .center
+    var spacing: CGFloat = 8
+    @ViewBuilder let content: Content
+    @Environment(\.isCompactWidth) private var compact
+    var body: some View {
+        if compact { VStack(alignment: .leading, spacing: spacing) { content } } else { HStack(alignment: alignment, spacing: spacing) { content } }
+    }
+}
+
 // MARK: - Componentes
 
 /// Cartão branco de seção (raio 14, borda cinza).
@@ -40,16 +92,23 @@ struct SectionCard<Content: View>: View {
     var trailing: AnyView? = nil
     @ViewBuilder var content: Content
 
+    @Environment(\.isCompactWidth) private var compact
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
+            if compact {
                 Text(title).font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.ink)
-                Spacer()
-                trailing
+                if let trailing { trailing.frame(maxWidth: .infinity, alignment: .leading) }
+            } else {
+                HStack(spacing: 12) {
+                    Text(title).font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.ink)
+                    Spacer()
+                    trailing
+                }
             }
             content
         }
-        .padding(EdgeInsets(top: 18, leading: 20, bottom: 18, trailing: 20))
+        .padding(EdgeInsets(top: compact ? 14 : 18, leading: compact ? 14 : 20, bottom: compact ? 14 : 18, trailing: compact ? 14 : 20))
         // Sem `clipShape` no cartão: no macOS 26 os controles AppKit (menus, caixas de seleção,
         // setas dos DisclosureGroup) ficavam quase transparentes dentro de um contêiner recortado.
         .background(Theme.card, in: RoundedRectangle(cornerRadius: 14))
@@ -137,7 +196,10 @@ struct MutedText: View {
     let text: String
     var size: CGFloat = 12
     init(_ text: String, size: CGFloat = 12) { self.text = text; self.size = size }
-    var body: some View { Text(text).font(.system(size: size)).foregroundStyle(Theme.muted) }
+    var body: some View {
+        Text(text).font(.system(size: size)).foregroundStyle(Theme.muted)
+            .fixedSize(horizontal: false, vertical: true) // quebra linha em vez de truncar
+    }
 }
 
 /// Botão azul preenchido (primário) ou branco com texto azul (fantasma).
@@ -212,12 +274,7 @@ struct MetricCard: View {
 /// Dois cartões lado a lado quando há largura; empilhados no iPhone.
 struct EyePair<Content: View>: View {
     @ViewBuilder let content: (Eye) -> Content
-    #if os(iOS)
-    @Environment(\.horizontalSizeClass) private var sizeClass
-    private var stacked: Bool { sizeClass == .compact }
-    #else
-    private let stacked = false
-    #endif
+    @Environment(\.isCompactWidth) private var stacked
 
     var body: some View {
         if stacked {

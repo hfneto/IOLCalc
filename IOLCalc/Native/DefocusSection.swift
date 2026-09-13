@@ -107,7 +107,7 @@ struct DefocusSection: View {
     }
 
     private var toggles: some View {
-        HStack(spacing: 14) {
+        FlowLayout(spacing: 14) {
             Toggle("considerar astigmatismo", isOn: $model.astigmatismOn)
             Toggle("mostrar olhos individuais", isOn: $model.showMonocular)
         }
@@ -206,6 +206,7 @@ struct CompareDrawer: View {
             } label: {
                 HStack(spacing: 8) {
                     Text("⚖ Comparar 2 lentes no mesmo olho").font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.ink)
+                        .fixedSize(horizontal: false, vertical: true)
                     Chip(text: "gaveta")
                 }
             }
@@ -223,7 +224,7 @@ struct CompareDrawer: View {
 
     private var content: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .bottom, spacing: 10) {
+            AdaptiveHStack(alignment: .bottom, spacing: 10) {
                 VStack(alignment: .leading, spacing: 3) {
                     FieldLabel(text: "Olho")
                     Picker("", selection: $model.compareEye) { ForEach(Eye.allCases) { Text($0.rawValue).tag($0) } }
@@ -231,7 +232,6 @@ struct CompareDrawer: View {
                 }
                 VStack(alignment: .leading, spacing: 3) { FieldLabel(text: "Lente A"); LensPicker(selection: $model.compareA, placeholder: "— selecione —").pickerStyle(.menu).frame(maxWidth: 320, alignment: .leading) }
                 VStack(alignment: .leading, spacing: 3) { FieldLabel(text: "Lente B"); LensPicker(selection: $model.compareB, placeholder: "— selecione —").pickerStyle(.menu).frame(maxWidth: 320, alignment: .leading) }
-                Spacer()
             }
             let picks = picks
             if picks.isEmpty {
@@ -286,12 +286,7 @@ struct CompareDrawer: View {
 /// Mesmo comportamento do `EyePair` para conteúdo arbitrário (lado a lado ou empilhado).
 struct EyePairLike<Content: View>: View {
     @ViewBuilder let content: Content
-    #if os(iOS)
-    @Environment(\.horizontalSizeClass) private var sizeClass
-    private var stacked: Bool { sizeClass == .compact }
-    #else
-    private let stacked = false
-    #endif
+    @Environment(\.isCompactWidth) private var stacked
     var body: some View {
         if stacked { VStack(spacing: 12) { content } } else { HStack(alignment: .top, spacing: 12) { content } }
     }
