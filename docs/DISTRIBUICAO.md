@@ -2,21 +2,23 @@
 
 Atualizado em 13/09/2026.
 
-## Hoje (Apple ID gratuito, Personal Team)
+## Hoje (Apple Developer Program assinado em 13/09/2026)
 
 - Mac: rodar pelo Xcode (▶ com "My Mac") — o app fica em `DerivedData` e abre normalmente depois.
-- iPhone/iPad: ▶ com o aparelho no cabo. O perfil expira em **7 dias**; depois é só apertar ▶ de novo.
-- Limites do Personal Team: 3 apps por aparelho, sem iCloud, sem TestFlight, sem notarização.
+- iPhone/iPad: ▶ com o aparelho no cabo (perfil de desenvolvimento, agora válido por 1 ano) ou, sem
+  cabo, pelo TestFlight (abaixo).
 
-## Apple Developer Program (US$ 99/ano) — o que muda
+## Depois de assinar o Developer Program — conferir no Xcode
 
-1. developer.apple.com/programs › inscrever-se com o mesmo Apple ID do Xcode (pessoa física basta).
-2. No Xcode: Settings › Accounts › a conta passa a mostrar o Team pago; em Signing & Capabilities
-   escolha esse Team no target `IOLCalc` (troca o `DEVELOPMENT_TEAM` no projeto).
-3. **iCloud para os casos** (opcional): Signing & Capabilities › "+ Capability" › iCloud › iCloud
-   Documents, container `iCloud.br.com.drhallim.IOLCalc`. Depois, no `CaseStore`, trocar
-   `defaultURL` pelo container ubíquo (`FileManager.default.url(forUbiquityContainerIdentifier:)`
-   + `Documents/cases.json`) e observar mudanças com `NSMetadataQuery` — meia sessão.
+1. Settings › Accounts › a conta deve mostrar o Team pago. Se o Team ID for diferente de
+   `VFK4JUPXJF` (Personal Team), escolha o novo em Signing & Capabilities do target `IOLCalc`.
+2. **iCloud para os casos** já está no projeto: `IOLCalc/IOLCalc.entitlements` (iCloud Documents,
+   container `iCloud.br.com.drhallim.IOLCalc`) e o `CaseStore` grava em
+   `iCloud Drive/IOLCalc/Documents/cases.json`. Na primeira compilação com o Team pago o Xcode
+   registra a capacidade e o container no portal; se ele reclamar do perfil, use
+   "+ Capability › iCloud › iCloud Documents" e marque o container.
+3. **Chave da API pelo iCloud Keychain**: a chave é sincronizada entre os aparelhos do mesmo Apple ID
+   (ligue "Senhas e Keychain" no iCloud do Mac e do iPhone). O app pede Face ID / Touch ID ao abrir.
 
 ## TestFlight (iPhone e iPad sem cabo, build válido por 90 dias)
 

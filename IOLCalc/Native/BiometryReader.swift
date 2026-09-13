@@ -211,6 +211,10 @@ final class AIReaderState {
             status = Status(kind: .error, text: "Configure a chave da API da Anthropic (Leitura por IA · avançado › Configurar chave).")
             return
         }
+        guard await AppLock.shared.ensureKeyAccess() else {
+            status = Status(kind: .error, text: "Confirme com \(AppLock.methodName) para liberar a chave da API.")
+            return
+        }
         busy = true
         defer { busy = false }
         do {

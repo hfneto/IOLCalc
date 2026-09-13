@@ -32,7 +32,8 @@ cd IOLCore && swift test
 ## Leitura por IA
 
 Na primeira abertura o app pede a **chave da API da Anthropic** (`sk-ant-…`, criada em
-console.anthropic.com). Ela é conferida com `GET /v1/models`, guardada no Keychain do aparelho e
+console.anthropic.com). Ela é conferida com `GET /v1/models`, guardada no Keychain (sincronizada
+pelo iCloud Keychain para os outros aparelhos, protegida por Face ID / Touch ID ao abrir o app) e
 nunca sai dele: o laudo vai direto do app para `api.anthropic.com` (`IOLCalc/AIReader.swift`), sem
 servidor intermediário. "Trocar chave da API" fica em
 Biometria › Leitura por IA · avançado. O WordPress não é mais usado para nada.
@@ -74,7 +75,9 @@ seção 7 (planejamento tórico com diagrama arrastável), todas calculando com 
   `-iol_no_keychain YES` pula o Keychain (um binário recém-compilado faria o sistema pedir confirmação
   e travaria a captura). Se o app já estiver aberto pelo Xcode, o macOS não abre a janela de uma
   segunda instância: compile a cópia de captura com outro bundle id
-  (`xcodebuild … -derivedDataPath DerivedData/Snap build PRODUCT_BUNDLE_IDENTIFIER=br.com.drhallim.IOLCalcSnap`;
+  (`xcodebuild … -derivedDataPath DerivedData/Snap build PRODUCT_BUNDLE_IDENTIFIER=br.com.drhallim.IOLCalcSnap
+  CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- CODE_SIGN_ENTITLEMENTS= DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER=`,
+  assinatura ad hoc sem o entitlement do iCloud, que exigiria perfil;
   o container passa a ser `~/Library/Containers/br.com.drhallim.IOLCalcSnap/Data`).
 - `IOLCore/Toric.swift` porta o módulo tórico da web (`torState`/`toricRecalc`): astigmatismo total
   por K anterior, Abulafia-Koch, Næser-Savini ou TK medido; SIA vetorial; cilindro da LIO convertido

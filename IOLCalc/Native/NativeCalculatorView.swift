@@ -5,7 +5,7 @@ import IOLCore
 /// defocus e binocular, comparador, simulação visual e tórica, calculando com o `IOLCore`.
 struct NativeCalculatorView: View {
     @State private var model = CalculatorModel()
-    @State private var store = CaseStore()
+    @State private var store = CaseStore(useCloud: true)
     @State private var showReport = false
     @State private var showCases = false
 

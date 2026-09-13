@@ -28,6 +28,10 @@ struct CasesSheet: View {
                 if let err = store.loadError {
                     Text(err).font(.system(size: 12)).foregroundStyle(Theme.errInk).padding(10)
                 }
+                if let st = store.cloudStatus {
+                    Label(st, systemImage: store.isCloud ? "icloud" : "icloud.slash")
+                        .font(.system(size: 12)).foregroundStyle(Theme.muted).padding(10)
+                }
             }
             .background(Theme.bg)
             .navigationTitle("Casos salvos")

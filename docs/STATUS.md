@@ -1,4 +1,4 @@
-# Estado do projeto — 12/09/2026
+# Estado do projeto — 13/09/2026
 
 Sessões: https://claude.ai/code/session_0153A2Tu3tz7zphMYzUt9NQP (Fase 0),
 https://claude.ai/code/session_01WvfqNJWEFnjbtQFmfWf4dC (Fases 3 a 5) e
@@ -88,13 +88,48 @@ margens de 12 pt. `EyePair`/`EyePairLike` passaram a usar o mesmo ambiente. Conf
 - Distribuição: `ITSAppUsesNonExemptEncryption = NO`, `PrivacyInfo.xcprivacy`, entitlements conferidos
   (sandbox, rede de saída, arquivos escolhidos). Guia completo em `docs/DISTRIBUICAO.md`.
 
+## iCloud, Face ID e chave sincronizada (13/09, depois do Developer Program)
+Pedido do usuário: no iPhone não conseguia "cadastrar" a chave; queria um acesso único na primeira
+vez e depois entrada automática por Face ID.
+- **Chave sincronizada** (`Auth.swift`): o item do Keychain agora é `kSecAttrSynchronizable` (iCloud
+  Keychain). Digitada uma vez no Mac, aparece no iPhone/iPad do mesmo Apple ID sem digitar de novo.
+  O item local antigo é promovido a sincronizado na primeira leitura; `clear()` apaga os dois.
+- **Bloqueio por Face ID / Touch ID** (`AppLock.swift`, `RootView.LockScreen`): ao abrir, se há chave e
+  a preferência `iol_lock_enabled` (padrão ligada; caixa na tela da chave) está ativa, a tela de
+  bloqueio pede `LAContext.deviceOwnerAuthentication` (biometria com senha como alternativa). "Usar sem
+  leitura por IA" deixa entrar; a leitura por IA chama `ensureKeyAccess()` e pede a biometria antes de
+  usar a chave. Volta do segundo plano depois de 5 min pede de novo. `NSFaceIDUsageDescription` no
+  Info.plist. Sem biometria nem senha no aparelho, não trava. É uma trava de uso do app: o item do
+  Keychain em si é protegido pelo desbloqueio do aparelho (itens sincronizados não aceitam
+  `SecAccessControl`).
+- **Casos no iCloud Drive** (`CaseStore.swift`): `useCloud: true` no app (os testes usam arquivo
+  temporário sem iCloud). O container `iCloud.br.com.drhallim.IOLCalc` é descoberto fora da thread
+  principal; `Documents/cases.json` lá é a verdade e `Application Support/IOLCalc/cases.json` continua
+  como espelho local. Primeira vez em cada aparelho: união dos casos locais com os do iCloud (o
+  `updatedAt` mais novo vence por id; flag `iol_cloud_migrated`); depois, o iCloud manda, então apagar
+  num aparelho apaga nos outros. `NSMetadataQuery` observa o arquivo e recarrega quando outro
+  aparelho grava (eco da própria gravação ignorado por comparação de bytes); leitura/gravação com
+  `NSFileCoordinator`. A `CasesSheet` mostra "iCloud ativo" / "iCloud indisponível".
+- **Projeto:** `IOLCalc/IOLCalc.entitlements` (iCloud Documents + container) em
+  `CODE_SIGN_ENTITLEMENTS`; a assinatura ad hoc do Mac (`CODE_SIGN_IDENTITY[sdk=macosx*] = -`) saiu,
+  porque o iCloud exige assinatura com o Team nas duas plataformas. As compilações de captura pelo
+  terminal passam `CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- CODE_SIGN_ENTITLEMENTS= DEVELOPMENT_TEAM=`
+  (ver README). Conferido: build macOS e iOS Simulator, `-iol_cases_test` OK, `-iol_phone_snapshot`.
+- **O que o usuário ainda precisa fazer no Xcode** (não dá para fazer pelo terminal): Settings ›
+  Accounts › conferir que a conta mostra o Team pago (se o Team ID for outro que `VFK4JUPXJF`,
+  trocar em Signing & Capabilities); na primeira compilação o Xcode registra a capacidade iCloud e o
+  container no portal — se reclamar do perfil, "+ Capability › iCloud › iCloud Documents" com o
+  container acima. iCloud Drive e iCloud Keychain precisam estar ligados no Mac e no iPhone.
+
 ## Pendências do usuário
-1. Abrir o app, colar a chave da API (console.anthropic.com) e ler um laudo real na tela nativa.
+1. Abrir o app no Mac, colar a chave da API (console.anthropic.com) e ler um laudo real; no iPhone a
+   chave chega pelo iCloud Keychain (nada a digitar) e o app pede Face ID ao abrir.
 2. Testar no iPhone (instruções na conversa: simulador sem Apple ID; aparelho físico com Apple ID +
    Team + Modo Desenvolvedor). Conferir o arrasto da seção 7 e o botão Imprimir do relatório.
 2b. Salvar um caso real, fechar e reabrir o app, abrir o caso pela lista "Casos".
 3. ~~Fase 1 do roadmap~~ feita em 13/09 (chave revogada, página apagada).
-4. ~~Apple ID no Xcode + Team no target~~ feito em 13/09; para TestFlight/iCloud, assinar o Developer Program (`docs/DISTRIBUICAO.md`).
+4. ~~Apple ID no Xcode + Team no target~~ feito em 13/09; ~~Developer Program~~ assinado em 13/09.
+   Falta conferir o Team pago no Xcode e compilar uma vez para registrar o iCloud (seção acima).
 5. Opcional: renomear `Auth.swift` → `APIKeyStore.swift` e `LoginView.swift` → `APIKeyView.swift`;
    apagar o worktree antigo (comando acima).
 
@@ -102,8 +137,10 @@ margens de 12 pt. `EyePair`/`EyePairLike` passaram a usar o mesmo ambiente. Conf
 - Roadmap de migração concluído. Próximo: a rodada de refinamento combinada (ver memória
   "iolcalc-refinamento-final": alinhamento das telas na simulação, revisão geral da tela e do
   relatório, iPhone), depois distribuição (Apple ID/TestFlight).
-- Casos salvos: sincronizar via iCloud Drive (basta trocar a URL do `CaseStore` para o container
-  ubíquo) se quiser os mesmos casos no Mac e no iPhone; exportar/importar um caso como arquivo.
+- Casos salvos: iCloud feito em 13/09. Se um dia houver conflito de versões do iCloud
+  (`NSFileVersion`), o app ignora; o arquivo é pequeno e de um único usuário.
+- TestFlight: agora possível (`docs/DISTRIBUICAO.md`), para instalar no iPhone sem cabo e sem o
+  limite de 7 dias.
 - Relatório: no PDF, o corte de página pode cair no meio de um bloco (é o `ImageRenderer` deslocado
   por página). Se incomodar, renderizar as seções separadamente e paginar por bloco.
 - Seção 4 (calculadoras oficiais) na tela nativa: reaproveitar `CalculatorFillSheet` com os

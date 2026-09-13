@@ -8,6 +8,7 @@ struct APIKeyView: View {
     var onSkip: () -> Void
 
     @State private var key = ""
+    @AppStorage("iol_lock_enabled") private var lockEnabled = true
     @State private var busy = false
     @State private var error: String?
     @FocusState private var focused: Bool
@@ -19,7 +20,7 @@ struct APIKeyView: View {
             Image("AppIcon-Login").resizable().scaledToFit().frame(width: 56, height: 56).clipShape(RoundedRectangle(cornerRadius: 12))
             VStack(spacing: 6) {
                 Text("Calculadora de LIO").font(.title2.weight(.bold))
-                Text("Cole a sua chave da API da Anthropic para ativar a leitura de laudos por IA. A chave fica guardada no Keychain deste aparelho e os laudos vão direto para a API, sem passar por nenhum servidor intermediário.")
+                Text("Cole a sua chave da API da Anthropic para ativar a leitura de laudos por IA. Digite uma vez: a chave fica no Keychain e o iCloud a leva para os seus outros aparelhos. Os laudos vão direto para a API, sem passar por nenhum servidor intermediário.")
                     .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
             }
             VStack(alignment: .leading, spacing: 4) {
@@ -36,6 +37,11 @@ struct APIKeyView: View {
                 }
                 .font(.footnote).buttonStyle(.plain).foregroundStyle(.tint)
             }
+            Toggle("Pedir \(AppLock.methodName) ao abrir o app", isOn: $lockEnabled)
+                .font(.subheadline)
+                #if os(macOS)
+                .toggleStyle(.checkbox)
+                #endif
             if let error {
                 Text(error).font(.footnote).foregroundStyle(.red).multilineTextAlignment(.center)
             }
@@ -65,6 +71,7 @@ struct APIKeyView: View {
             do {
                 try await AIReader.validate(apiKey: k)
                 APIKeyStore.save(k)
+                AppLock.shared.keyJustSaved()
                 onSave(k)
             } catch {
                 self.error = error.localizedDescription

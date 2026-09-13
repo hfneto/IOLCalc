@@ -87,13 +87,28 @@ struct CaseExport: Transferable {
     }
 }
 
-/// Casos salvos em `Application Support/IOLCalc/cases.json` (dentro do container do app).
-/// Lista em memória, gravada inteira a cada mudança (poucas dezenas de casos, arquivo pequeno).
+/// Casos salvos em `Application Support/IOLCalc/cases.json` (dentro do container do app) e, quando o
+/// iCloud está disponível, também em `iCloud Drive/IOLCalc/Documents/cases.json` — o mesmo arquivo
+/// no Mac, no iPhone e no iPad. Lista em memória, gravada inteira a cada mudança (poucas dezenas de
+/// casos, arquivo pequeno). O arquivo do iCloud é a verdade; o local é um espelho para abrir rápido
+/// e para quando o iCloud não estiver disponível.
 @Observable
 final class CaseStore {
     private(set) var cases: [SavedCase] = []
     private(set) var loadError: String?
+    /// Arquivo local (espelho).
     let fileURL: URL
+    /// Arquivo no container do iCloud, quando ativo.
+    private(set) var cloudURL: URL?
+    /// Texto curto para a interface: "iCloud ativo", "iCloud indisponível…", nil enquanto verifica.
+    private(set) var cloudStatus: String?
+    var isCloud: Bool { cloudURL != nil }
+
+    static let containerID = "iCloud.br.com.drhallim.IOLCalc"
+    private static let migratedKey = "iol_cloud_migrated"
+    @ObservationIgnored private var query: NSMetadataQuery?
+    @ObservationIgnored private var observers: [NSObjectProtocol] = []
+    @ObservationIgnored private var lastCloudWrite: Data?
 
     static let defaultURL: URL = {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
@@ -101,9 +116,16 @@ final class CaseStore {
         return base.appendingPathComponent("IOLCalc", isDirectory: true).appendingPathComponent("cases.json")
     }()
 
-    init(fileURL: URL = CaseStore.defaultURL) {
+    /// `useCloud: false` nos testes de depuração (arquivo temporário, sem iCloud).
+    init(fileURL: URL = CaseStore.defaultURL, useCloud: Bool = false) {
         self.fileURL = fileURL
         load()
+        if useCloud { attachCloud() }
+    }
+
+    deinit {
+        query?.stop()
+        observers.forEach { NotificationCenter.default.removeObserver($0) }
     }
 
     private static let encoder: JSONEncoder = {
@@ -132,11 +154,119 @@ final class CaseStore {
 
     private func persist() {
         do {
+            let data = try Self.encoder.encode(cases)
             try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try Self.encoder.encode(cases).write(to: fileURL, options: .atomic)
+            try data.write(to: fileURL, options: .atomic)
+            if let cloudURL { try writeCloud(data, to: cloudURL) }
+            loadError = nil
         } catch {
             loadError = "Não foi possível gravar os casos: \(error.localizedDescription)"
         }
+    }
+
+    // MARK: iCloud
+
+    /// Descobre o container do iCloud (fora da thread principal: a primeira chamada pode demorar),
+    /// funde o arquivo de lá com o local e passa a observar mudanças vindas dos outros aparelhos.
+    private func attachCloud() {
+        Task.detached(priority: .utility) { [weak self] in
+            let container = FileManager.default.url(forUbiquityContainerIdentifier: CaseStore.containerID)
+            await MainActor.run { self?.cloudReady(container) }
+        }
+    }
+
+    @MainActor private func cloudReady(_ container: URL?) {
+        guard let container else {
+            cloudStatus = "iCloud indisponível — entre no iCloud nos Ajustes e ative o iCloud Drive para sincronizar os casos"
+            return
+        }
+        let docs = container.appendingPathComponent("Documents", isDirectory: true)
+        try? FileManager.default.createDirectory(at: docs, withIntermediateDirectories: true)
+        let url = docs.appendingPathComponent("cases.json")
+        cloudURL = url
+        cloudStatus = "iCloud ativo — os casos aparecem no Mac, no iPhone e no iPad"
+        try? FileManager.default.startDownloadingUbiquitousItem(at: url)
+        reloadFromCloud()
+        startQuery()
+    }
+
+    private func startQuery() {
+        let q = NSMetadataQuery()
+        q.searchScopes = [NSMetadataQueryUbiquitousDocumentsScope]
+        q.predicate = NSPredicate(format: "%K == %@", NSMetadataItemFSNameKey, "cases.json")
+        for name in [NSNotification.Name.NSMetadataQueryDidFinishGathering, .NSMetadataQueryDidUpdate] {
+            observers.append(NotificationCenter.default.addObserver(forName: name, object: q, queue: .main) { [weak self] _ in
+                self?.cloudChanged()
+            })
+        }
+        query = q
+        q.start()
+    }
+
+    private func cloudChanged() {
+        guard let q = query, let url = cloudURL else { return }
+        q.disableUpdates()
+        defer { q.enableUpdates() }
+        for case let item as NSMetadataItem in q.results {
+            guard let itemURL = item.value(forAttribute: NSMetadataItemURLKey) as? URL, itemURL.standardizedFileURL == url.standardizedFileURL else { continue }
+            let status = item.value(forAttribute: NSMetadataUbiquitousItemDownloadingStatusKey) as? String
+            if status == NSMetadataUbiquitousItemDownloadingStatusCurrent {
+                reloadFromCloud()
+            } else {
+                try? FileManager.default.startDownloadingUbiquitousItem(at: url)
+            }
+        }
+    }
+
+    /// Lê o arquivo do iCloud (com coordenação) e aplica. Na primeira vez em cada aparelho, funde
+    /// com os casos locais (o mais recente de cada id vence); depois, o iCloud manda — assim um caso
+    /// apagado num aparelho some nos outros.
+    private func reloadFromCloud() {
+        guard let cloudURL else { return }
+        var data: Data?
+        var err: NSError?
+        NSFileCoordinator().coordinate(readingItemAt: cloudURL, options: [], error: &err) { u in data = try? Data(contentsOf: u) }
+        let remote: [SavedCase]
+        if let data {
+            if data == lastCloudWrite { return }   // eco da nossa própria gravação
+            guard let parsed = try? Self.decoder.decode([SavedCase].self, from: data) else {
+                loadError = "Arquivo de casos do iCloud ilegível; mantendo a cópia local."
+                return
+            }
+            remote = parsed
+        } else {
+            remote = []   // ainda não existe no iCloud (ou não baixou): só publicar os locais
+        }
+        let migrated = UserDefaults.standard.bool(forKey: Self.migratedKey)
+        var merged: [SavedCase]
+        if migrated && data != nil {
+            merged = remote
+        } else {
+            merged = remote
+            for c in cases {
+                if let i = merged.firstIndex(where: { $0.id == c.id }) {
+                    if c.updatedAt > merged[i].updatedAt { merged[i] = c }
+                } else {
+                    merged.append(c)
+                }
+            }
+        }
+        merged.sort { $0.updatedAt > $1.updatedAt }
+        let changed = merged != cases
+        cases = merged
+        if changed || data == nil || !migrated { persist() }
+        if data != nil || !cases.isEmpty { UserDefaults.standard.set(true, forKey: Self.migratedKey) }
+    }
+
+    private func writeCloud(_ data: Data, to url: URL) throws {
+        var err: NSError?
+        var inner: Error?
+        NSFileCoordinator().coordinate(writingItemAt: url, options: .forReplacing, error: &err) { u in
+            do { try data.write(to: u, options: .atomic) } catch { inner = error }
+        }
+        if let err { throw err }
+        if let inner { throw inner }
+        lastCloudWrite = data
     }
 
     /// Salva o estado do modelo como caso novo e devolve o caso.
