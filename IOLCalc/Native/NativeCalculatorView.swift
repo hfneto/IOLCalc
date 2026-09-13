@@ -1,8 +1,8 @@
 import SwiftUI
 import IOLCore
 
-/// Seções 1 a 3, 5, 6 e 7 da calculadora (biometria, lentes e alvo, poder da LIO, defocus, simulação, tórica) em SwiftUI,
-/// calculando com o `IOLCore`. Substitui, aos poucos, a página web embutida.
+/// A calculadora inteira em SwiftUI: biometria, lentes e alvo, poder da LIO, calculadoras oficiais,
+/// defocus e binocular, comparador, simulação visual e tórica, calculando com o `IOLCore`.
 struct NativeCalculatorView: View {
     @State private var model = CalculatorModel()
     @State private var store = CaseStore()
@@ -16,6 +16,7 @@ struct NativeCalculatorView: View {
                 BiometrySection(model: model)
                 LensSection(model: model)
                 PowerSection(model: model)
+                CalculatorsSection(model: model)
                 DefocusSection(model: model)
                 CompareDrawer(model: model)
                 SimulationSection(model: model)

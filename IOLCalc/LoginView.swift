@@ -32,7 +32,7 @@ struct APIKeyView: View {
                     #endif
                     .onSubmit { submit() }
                 Button("Criar ou copiar uma chave em console.anthropic.com") {
-                    WebCoordinator.openExternally(Self.consoleURL)
+                    ExternalLinks.open(Self.consoleURL)
                 }
                 .font(.footnote).buttonStyle(.plain).foregroundStyle(.tint)
             }

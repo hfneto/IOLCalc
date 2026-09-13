@@ -54,7 +54,12 @@ A Fase 6 foi feita direto em `main` (o worktree `worktree-biometria-swiftui` em
   - Verificado por `-iol_report_pdf` (2 páginas A4 no caso de exemplo) e `-iol_cases_test` (OK).
   - Ajustes pedidos depois: sem linhas de assinatura; só entram os olhos com LIO escolhida; a seção
     tórica só aparece quando há cilindro > 0 em algum olho.
-- Seletor "Página web / Nativo · beta" no topo (`RootView`); a página web continua completa.
+- **Fase 8 (12/09, noite):** `index.html`, `ContentView`, `CalculatorWebView` (bridge), `ReportSheet`
+  (relatório web) e `Tools/webtest.swift` removidos; `RootView` mostra só a tela nativa. Seção 4
+  nativa (`CalculatorsSection.swift`): botões das calculadoras oficiais → `CalculatorFillSheet` com
+  `CalculatorFill.script` (heurística de rótulos portada do JS) e `CalculatorModel.biometryJSON()`
+  no formato do antigo `bioJSON()`; "Copiar biometria" (texto). `FlowLayout` para os botões
+  quebrarem linha no iPhone. Fase 2 ficou desnecessária.
 - Roadmap de saída do WordPress em `docs/ROADMAP.md`; canvas de design:
   https://claude.ai/code/artifact/53b9c69e-7379-446f-951d-d1488f7621e4
 
@@ -78,8 +83,9 @@ escuro de verdade, é preciso uma paleta escura no `Theme`, não só tirar essa 
    apagar o worktree antigo (comando acima).
 
 ## Próximos passos sugeridos
-- Fase 2 (origem própria + migrar `localStorage`) e depois Fase 8 (remover o `index.html`); com isso o
-  seletor "Página web / Nativo" some e a tela nativa vira a única.
+- Roadmap de migração concluído. Próximo: a rodada de refinamento combinada (ver memória
+  "iolcalc-refinamento-final": alinhamento das telas na simulação, revisão geral da tela e do
+  relatório, iPhone), depois distribuição (Apple ID/TestFlight).
 - Casos salvos: sincronizar via iCloud Drive (basta trocar a URL do `CaseStore` para o container
   ubíquo) se quiser os mesmos casos no Mac e no iPhone; exportar/importar um caso como arquivo.
 - Relatório: no PDF, o corte de página pode cair no meio de um bloco (é o `ImageRenderer` deslocado
@@ -96,7 +102,7 @@ escuro de verdade, é preciso uma paleta escura no `Theme`, não só tirar essa 
   recém-compilado faz o Keychain pedir confirmação e a captura trava). Se o usuário estiver com o
   app aberto no Xcode, a segunda instância fica sem janela: compilar a cópia de captura com
   `PRODUCT_BUNDLE_IDENTIFIER=br.com.drhallim.IOLCalcSnap` em `DerivedData/Snap` (ver README).
-  `-iol_sample YES -iol_native_ui YES -iol_snapshot <png>` grava a janela em PNG dentro de
+  `-iol_sample YES -iol_snapshot <png>` grava a janela em PNG dentro de
   `~/Library/Containers/br.com.drhallim.IOLCalc/Data/`; `-iol_snapshot_bottom YES` rola até o fim.
   `-iol_chart_snapshot <png>` renderiza só o gráfico; `-iol_toric_snapshot <png>` a seção 7;
   `-iol_sim_snapshot <png>` a seção 6 (dia e noite; `-iol_sim_astig YES` liga o astigmatismo). No `ImageRenderer`

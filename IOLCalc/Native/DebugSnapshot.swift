@@ -42,6 +42,11 @@ enum DebugSnapshot {
             model.fillSample()
             write(ToricSection(model: model), to: path)
         }
+        if let path = d.string(forKey: "iol_calcs_snapshot") {
+            let model = CalculatorModel()
+            model.fillSample()
+            write(CalculatorsSection(model: model), to: path)
+        }
         if let path = d.string(forKey: "iol_report_snapshot") {
             let model = CalculatorModel()
             model.fillSample()

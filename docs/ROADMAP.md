@@ -1,6 +1,6 @@
 # Roadmap — Calculadora de LIO fora do WordPress
 
-Atualizado em 12/09/2026.
+Atualizado em 12/09/2026 (noite).
 
 ## Onde o WordPress entrava
 
@@ -30,15 +30,11 @@ Nada no app depende disto; é higiene e segurança.
 3. Trocar a página `/calculo` por um aviso "a calculadora virou app" (ou apagar). Quem ainda tiver
    a PWA instalada continua com a versão antiga em cache, sem leitura por IA.
 
-## Fase 2 — Cortar o último fio (1 sessão)
+## Fase 2 — Cortar o último fio — desnecessária
 
-- Carregar a página com uma origem própria (ex.: `iolcalc://app/` via `WKURLSchemeHandler`), sem
-  citar o domínio do site.
-- Antes de trocar a origem, migrar uma vez o `localStorage` antigo (modelo de IA, método de
-  cálculo, preferências) para `UserDefaults`, para não perder o que já está salvo.
-- Tirar "drhallim.com.br" do rodapé do relatório e da nota de rodapé da página.
-
-Ao fim desta fase o app é 100% autônomo; o site pode sair do ar sem efeito.
+Seria carregar a página com origem própria e migrar o `localStorage`. Com a Fase 8 a página deixou
+de existir: as preferências já vivem no `UserDefaults` da tela nativa (`iol_method`, `iol_dA2_*`,
+`iol_model`) e os casos salvos em `Application Support`. Nada no app cita o site.
 
 ## Fase 3 — Biometria e cálculo em SwiftUI ✅ (11/09/2026, seções 1–3 em `IOLCalc/Native/`)
 
@@ -69,10 +65,13 @@ Relatório em SwiftUI (`ReportView`), exportado com `ImageRenderer` para PDF A4 
 De quebra, **casos salvos** (`CaseStore`, `CasesSheet`): o planejamento inteiro (biometria, lentes,
 alvos, tórica, comparador) fica em `Application Support/IOLCalc/cases.json`.
 
-## Fase 8 — Remover o `index.html` (meia sessão)
+## Fase 8 — Remover o `index.html` ✅ (12/09/2026)
 
-Apagar a página, o `WKWebView` principal e o bridge. As calculadoras oficiais (Barrett, Kane,
-ESCRS, Hill-RBF, Lucena) continuam abrindo em `WKWebView`, porque são sites de terceiros.
+Página, `WKWebView` principal, bridge, relatório web e seletor "Página web / Nativo" removidos; a
+seção 4 (calculadoras oficiais) ganhou versão nativa (`CalculatorsSection`), com a mesma heurística
+de preenchimento (`CalculatorFill.script`) e "Copiar biometria". Barrett, Kane, ESCRS, Hill-RBF e
+Lucena continuam abrindo em `WKWebView` (`CalculatorFillSheet`), porque são sites de terceiros.
+`Web/` fica só como snapshot histórico da versão web.
 
 ## Distribuição
 

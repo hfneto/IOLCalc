@@ -7,10 +7,10 @@ Sucessor da versão web publicada em drhallim.com.br/calculo (que será desconti
 | Pasta | O que é |
 |---|---|
 | `IOLCalc.xcodeproj` | Projeto Xcode. Um único target `IOLCalc` para iPhone, iPad e Mac. |
-| `IOLCalc/` | App SwiftUI. Alterna entre a calculadora web embutida (`index.html` em `WKWebView`) e a versão nativa em `IOLCalc/Native/` (seções 1 a 3 e 5 a 7, relatório e casos salvos, "Nativo · beta"). |
+| `IOLCalc/` | App SwiftUI. A calculadora inteira é nativa (`IOLCalc/Native/`: seções 1 a 7, relatório, casos salvos); `CalculatorFillSheet` abre as calculadoras oficiais (sites de terceiros) em `WKWebView` e preenche a biometria. |
 | `IOLCore/` | Pacote Swift com o motor nativo: fórmulas (SRK/T, T2, Holladay 1 ± Wang-Koch, Hoffer Q, Haigis, Castrop), catálogo de lentes, curva de defocus, visão binocular, estereopsia, planejamento tórico (vetores de duplo-ângulo, Abulafia-Koch, Næser-Savini, razão de toricidade) e constantes da simulação visual. |
 | `IOLCore/Tests` | Testes contra valores gerados pelo JavaScript original (`docs/golden-generator.js`, `docs/toric-generator.js`). |
-| `Web/` | Snapshot da versão web (index.html, service worker, plugin PHP do proxy de IA). Referência histórica. |
+| `Web/` | Snapshot da versão web (index.html, service worker, plugin PHP). Referência histórica: o app não usa mais nenhuma página embutida. |
 | `server/` | **Obsoleto.** Plugin WordPress v2.2 que nunca foi instalado; a leitura por IA agora é feita no app. Mantido só como referência. |
 | `design/` | Pranchas do layout desktop (canvas do Claude Design) usadas como referência da interface. |
 | `docs/` | `ROADMAP.md` (saída do WordPress), `STATUS.md`, artigo da regressão tórica e o gerador de valores de referência. |
@@ -34,31 +34,25 @@ cd IOLCore && swift test
 Na primeira abertura o app pede a **chave da API da Anthropic** (`sk-ant-…`, criada em
 console.anthropic.com). Ela é conferida com `GET /v1/models`, guardada no Keychain do aparelho e
 nunca sai dele: o laudo vai direto do app para `api.anthropic.com` (`IOLCalc/AIReader.swift`), sem
-servidor intermediário. A página injeta `window.IOL_NATIVE.ai` e chama
-`webkit.messageHandlers.aiRead` para ler o laudo. "Trocar chave da API" fica em
+servidor intermediário. "Trocar chave da API" fica em
 Biometria › Leitura por IA · avançado. O WordPress não é mais usado para nada.
 
-## Como o híbrido funciona
+## Calculadoras oficiais
 
-- `IOLCalc/index.html` é uma cópia da versão web (sem o registro do service worker).
-- A página é carregada com a origem `https://drhallim.com.br/calculo/` apenas para que o
-  `localStorage` (modelo de IA, método de cálculo) tenha um domínio estável; nenhuma chamada de rede
-  vai para o site (ver fase 2 do `docs/ROADMAP.md`).
-- Links externos (Barrett, Kane, ESCRS…) abrem no navegador do sistema.
-- O botão **Relatório** abre uma sheet com o relatório, com impressão e exportação em PDF.
-- Em **Calculadoras oficiais**, cada botão abre a calculadora (Barrett, Kane, ESCRS, Hill-RBF, Lucena) numa
-  sheet e injeta a biometria nos campos reconhecidos por rótulo (mesma heurística do antigo bookmarklet).
+Em **4 · Calculadoras oficiais**, cada botão abre a calculadora (Barrett, Kane, ESCRS, Hill-RBF,
+Lucena) numa sheet e injeta a biometria nos campos reconhecidos por rótulo (heurística em
+`CalculatorFill.script`, a mesma do antigo bookmarklet). "Copiar biometria" põe o resumo em texto na
+área de transferência. Links externos abrem no navegador do sistema.
 
 ## Plano de migração para nativo
 
 Ver `docs/ROADMAP.md`. Resumo: fórmulas (feito) → IA no app (feito) → desligar o site → origem
-própria → biometria e cálculo em SwiftUI (feito) → Swift Charts (feito) → IA com câmera (feito) →
-tórica e simulação (feito) → relatório nativo (feito) → remover o `index.html`.
+biometria e cálculo em SwiftUI (feito) → Swift Charts (feito) → IA com câmera (feito) → tórica e
+simulação (feito) → relatório nativo (feito) → remover o `index.html` (feito). O app é 100 % nativo.
 
-## Tela nativa (Nativo · beta)
+## Tela nativa
 
-O seletor no topo do app alterna "Página web" / "Nativo · beta" (`RootView`). A tela nativa
-(`IOLCalc/Native/`) tem as seções 1 a 3 (biometria, lentes e alvo, poder da LIO), a seção 5 (curva de
+A tela (`IOLCalc/Native/`) tem as seções 1 a 3 (biometria, lentes e alvo, poder da LIO), a seção 5 (curva de
 defocus, binocular, métricas), a gaveta de comparação, a seção 6 (simulação visual em `Canvas`) e a
 seção 7 (planejamento tórico com diagrama arrastável), todas calculando com o `IOLCore`:
 
@@ -69,7 +63,7 @@ seção 7 (planejamento tórico com diagrama arrastável), todas calculando com 
   `PlanningTests` confere paridade 1e-9 com o JavaScript (`Resources/planning.json`, gerado com o
   motor do `index.html` no JavaScriptCore).
 - Argumentos de execução úteis em DEBUG/macOS: `-iol_sample YES` preenche o caso da prancha de
-  design; `-iol_snapshot <png>` (com `-iol_snapshot_height`, `-iol_snapshot_scroll` ou
+  design (`-iol_native_ui` não é mais necessário); `-iol_snapshot <png>` (com `-iol_snapshot_height`, `-iol_snapshot_scroll` ou
   `-iol_snapshot_bottom YES`) grava a janela em PNG dentro do container do app;
   `-iol_chart_snapshot <png>` renderiza só o gráfico de defocus; `-iol_toric_snapshot <png>` e
   `-iol_sim_snapshot <png>` (com `-iol_sim_night YES`, `-iol_sim_astig YES`) renderizam as seções 7 e 6;
