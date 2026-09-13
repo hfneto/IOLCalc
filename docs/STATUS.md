@@ -81,13 +81,20 @@ no Mac), `SectionCard` põe o "trailing" abaixo do título, `FlowLayout` para li
 margens de 12 pt. `EyePair`/`EyePairLike` passaram a usar o mesmo ambiente. Conferido no simulador
 (iPhone 17) e no render `-iol_phone_snapshot`.
 
+## Itens 3 e 4 (13/09)
+- Casos: exportar/importar como arquivo (`CaseExport`, `CaseFile`, `CaseStore.importCases`), para
+  levar casos entre Mac e iPhone por AirDrop/Arquivos. iCloud fica para depois do Developer Program
+  (Personal Team não tem a capacidade iCloud) — passos em `docs/DISTRIBUICAO.md`.
+- Distribuição: `ITSAppUsesNonExemptEncryption = NO`, `PrivacyInfo.xcprivacy`, entitlements conferidos
+  (sandbox, rede de saída, arquivos escolhidos). Guia completo em `docs/DISTRIBUICAO.md`.
+
 ## Pendências do usuário
 1. Abrir o app, colar a chave da API (console.anthropic.com) e ler um laudo real na tela nativa.
 2. Testar no iPhone (instruções na conversa: simulador sem Apple ID; aparelho físico com Apple ID +
    Team + Modo Desenvolvedor). Conferir o arrasto da seção 7 e o botão Imprimir do relatório.
 2b. Salvar um caso real, fechar e reabrir o app, abrir o caso pela lista "Casos".
 3. ~~Fase 1 do roadmap~~ feita em 13/09 (chave revogada, página apagada).
-4. Apple ID no Xcode + Team no target para rodar no iPhone.
+4. ~~Apple ID no Xcode + Team no target~~ feito em 13/09; para TestFlight/iCloud, assinar o Developer Program (`docs/DISTRIBUICAO.md`).
 5. Opcional: renomear `Auth.swift` → `APIKeyStore.swift` e `LoginView.swift` → `APIKeyView.swift`;
    apagar o worktree antigo (comando acima).
 

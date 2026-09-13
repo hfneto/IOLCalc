@@ -13,7 +13,7 @@ Sucessor da versão web publicada em drhallim.com.br/calculo (que será desconti
 | `Web/` | Snapshot da versão web (index.html, service worker, plugin PHP). Referência histórica: o app não usa mais nenhuma página embutida. |
 | `server/` | **Obsoleto.** Plugin WordPress v2.2 que nunca foi instalado; a leitura por IA agora é feita no app. Mantido só como referência. |
 | `design/` | Pranchas do layout desktop (canvas do Claude Design) usadas como referência da interface. |
-| `docs/` | `ROADMAP.md` (saída do WordPress), `STATUS.md`, artigo da regressão tórica e o gerador de valores de referência. |
+| `docs/` | `ROADMAP.md` (migração, concluída), `STATUS.md`, `DISTRIBUICAO.md` (TestFlight, Developer ID, iCloud), artigo da regressão tórica, geradores de valores de referência e prompts das cenas. |
 
 ## Como rodar
 
