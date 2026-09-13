@@ -21,14 +21,10 @@ do site no rodapé do relatório.
 - A página chama `webkit.messageHandlers.aiRead` em vez de `fetch('/wp-json/iol/v1/read')`.
 - Login por e-mail/senha e plugin v2.2 abandonados (`server/` ficou só como referência).
 
-## Fase 1 — Desligar o lado do site (tarefa sua, 15 min)
+## Fase 1 — Desligar o lado do site ✅ (13/09/2026, pelo usuário)
 
-Nada no app depende disto; é higiene e segurança.
-
-1. Revogar no console da Anthropic a chave que estava no WordPress e criar uma nova só para o app.
-2. Desativar e apagar o plugin **IOL Proxy** no WordPress.
-3. Trocar a página `/calculo` por um aviso "a calculadora virou app" (ou apagar). Quem ainda tiver
-   a PWA instalada continua com a versão antiga em cache, sem leitura por IA.
+Chave antiga da Anthropic revogada no console; plugin e página `/calculo` apagados do WordPress.
+O site não participa mais de nada.
 
 ## Fase 2 — Cortar o último fio — desnecessária
 

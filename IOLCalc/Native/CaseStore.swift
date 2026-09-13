@@ -1,6 +1,8 @@
 import Foundation
 import Observation
 import IOLCore
+import CoreTransferable
+import UniformTypeIdentifiers
 
 /// Estado completo de um planejamento, como salvo em disco.
 struct CaseSnapshot: Codable, Equatable {
@@ -33,6 +35,55 @@ struct SavedCase: Codable, Identifiable, Equatable {
     static func defaultName(for snapshot: CaseSnapshot) -> String {
         let n = snapshot.patientName.trimmingCharacters(in: .whitespacesAndNewlines)
         return n.isEmpty ? "Caso sem nome" : n
+    }
+
+    /// Nome de arquivo seguro: "Caso-Maria-da-Silva.iolcase.json".
+    var fileName: String {
+        let safe = name.components(separatedBy: CharacterSet.alphanumerics.inverted).filter { !$0.isEmpty }.joined(separator: "-")
+        return "Caso-" + (safe.isEmpty ? "sem-nome" : safe) + ".iolcase.json"
+    }
+}
+
+/// Arquivo de casos (um ou vários) para compartilhar entre aparelhos (AirDrop, Arquivos, e-mail).
+struct CaseFile: Codable {
+    var format = "iolcase"
+    var version = 1
+    var cases: [SavedCase]
+
+    init(cases: [SavedCase]) { self.cases = cases }
+
+    static let encoder: JSONEncoder = {
+        let e = JSONEncoder()
+        e.dateEncodingStrategy = .iso8601
+        e.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return e
+    }()
+
+    static let decoder: JSONDecoder = {
+        let d = JSONDecoder()
+        d.dateDecodingStrategy = .iso8601
+        return d
+    }()
+
+    /// Aceita o arquivo do app ou um `SavedCase` avulso.
+    static func parse(_ data: Data) throws -> [SavedCase] {
+        if let file = try? decoder.decode(CaseFile.self, from: data) { return file.cases }
+        if let one = try? decoder.decode(SavedCase.self, from: data) { return [one] }
+        return try decoder.decode([SavedCase].self, from: data)
+    }
+}
+
+/// Exportação sob demanda: o arquivo só é escrito quando o usuário compartilha.
+struct CaseExport: Transferable {
+    let cases: [SavedCase]
+    let fileName: String
+
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(exportedContentType: .json) { export in
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent(export.fileName)
+            try CaseFile.encoder.encode(CaseFile(cases: export.cases)).write(to: url, options: .atomic)
+            return SentTransferredFile(url)
+        }
     }
 }
 
@@ -134,4 +185,31 @@ final class CaseStore {
     }
 
     func contains(_ id: UUID?) -> Bool { id.map { i in cases.contains { $0.id == i } } ?? false }
+
+    func export(_ c: SavedCase) -> CaseExport { CaseExport(cases: [c], fileName: c.fileName) }
+
+    func exportAll() -> CaseExport {
+        let f = DateFormatter(); f.dateFormat = "yyyyMMdd"
+        return CaseExport(cases: cases, fileName: "Casos-LIO-\(f.string(from: Date())).iolcase.json")
+    }
+
+    /// Importa os casos de um arquivo. Casos com o mesmo id de um existente são atualizados se
+    /// forem mais recentes; os demais entram como novos. Devolve quantos entraram/atualizaram.
+    @discardableResult
+    func importCases(from url: URL) throws -> Int {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        let incoming = try CaseFile.parse(try Data(contentsOf: url))
+        var n = 0
+        for c in incoming {
+            if let i = cases.firstIndex(where: { $0.id == c.id }) {
+                if c.updatedAt > cases[i].updatedAt { cases[i] = c; n += 1 }
+            } else {
+                cases.append(c); n += 1
+            }
+        }
+        cases.sort { $0.updatedAt > $1.updatedAt }
+        persist()
+        return n
+    }
 }

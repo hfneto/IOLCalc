@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Casos salvos: salvar/atualizar o planejamento atual, abrir, renomear e apagar.
 struct CasesSheet: View {
@@ -9,6 +10,7 @@ struct CasesSheet: View {
     @State private var newName = ""
     @State private var toDelete: SavedCase?
     @State private var flash: String?
+    @State private var importing = false
 
     private var loaded: SavedCase? { store.cases.first { $0.id == model.loadedCaseID } }
 
@@ -34,6 +36,18 @@ struct CasesSheet: View {
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Fechar") { dismiss() } }
+                ToolbarItemGroup(placement: .primaryAction) {
+                    Button("Importar…", systemImage: "square.and.arrow.down") { importing = true }
+                    if !store.cases.isEmpty {
+                        ShareLink(item: store.exportAll(), preview: SharePreview("Casos de LIO")) { Label("Exportar todos", systemImage: "square.and.arrow.up") }
+                    }
+                }
+            }
+            .fileImporter(isPresented: $importing, allowedContentTypes: [.json], allowsMultipleSelection: true) { result in
+                guard case .success(let urls) = result else { return }
+                var total = 0
+                for url in urls { total += (try? store.importCases(from: url)) ?? 0 }
+                show(total == 0 ? "Nenhum caso novo no arquivo" : "\(total) caso\(total == 1 ? "" : "s") importado\(total == 1 ? "" : "s")")
             }
             .alert("Renomear caso", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
                 TextField("Nome", text: $newName)
@@ -69,7 +83,7 @@ struct CasesSheet: View {
                 }
                 if let flash { Text(flash).font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.okInk) }
             }
-            MutedText("O caso guarda biometria, lentes, alvos, régua, astigmatismo, planejamento tórico e comparador. O nome é o do paciente; renomeie pelo menu do caso.", size: 11.5)
+            MutedText("O caso guarda biometria, lentes, alvos, régua, astigmatismo, planejamento tórico e comparador. O nome é o do paciente; renomeie pelo menu do caso. Para levar um caso ao outro aparelho, exporte (AirDrop, Arquivos, e-mail) e importe lá.", size: 11.5)
         }
         .padding(14)
         .background(Theme.card)
@@ -83,6 +97,7 @@ struct CasesSheet: View {
                     .contextMenu {
                         Button("Abrir") { store.open(c, into: model); dismiss() }
                         Button("Renomear…") { newName = c.name; renaming = c }
+                        ShareLink(item: store.export(c), preview: SharePreview(c.name)) { Label("Exportar…", systemImage: "square.and.arrow.up") }
                         Button("Apagar…", role: .destructive) { toDelete = c }
                     }
                     #if os(iOS)
@@ -110,6 +125,7 @@ struct CasesSheet: View {
             }
             Spacer()
             #if os(macOS)
+            ShareLink(item: store.export(c), preview: SharePreview(c.name)) { Image(systemName: "square.and.arrow.up") }.buttonStyle(.borderless).help("Exportar (AirDrop, Arquivos, e-mail)")
             Button { newName = c.name; renaming = c } label: { Image(systemName: "pencil") }.buttonStyle(.borderless).help("Renomear")
             Button { toDelete = c } label: { Image(systemName: "trash") }.buttonStyle(.borderless).foregroundStyle(Theme.od).help("Apagar")
             #endif

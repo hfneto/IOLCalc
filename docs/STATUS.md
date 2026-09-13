@@ -86,7 +86,7 @@ margens de 12 pt. `EyePair`/`EyePairLike` passaram a usar o mesmo ambiente. Conf
 2. Testar no iPhone (instruções na conversa: simulador sem Apple ID; aparelho físico com Apple ID +
    Team + Modo Desenvolvedor). Conferir o arrasto da seção 7 e o botão Imprimir do relatório.
 2b. Salvar um caso real, fechar e reabrir o app, abrir o caso pela lista "Casos".
-3. Fase 1 do roadmap: revogar a chave que estava no WordPress, desativar o plugin, avisar em /calculo.
+3. ~~Fase 1 do roadmap~~ feita em 13/09 (chave revogada, página apagada).
 4. Apple ID no Xcode + Team no target para rodar no iPhone.
 5. Opcional: renomear `Auth.swift` → `APIKeyStore.swift` e `LoginView.swift` → `APIKeyView.swift`;
    apagar o worktree antigo (comando acima).

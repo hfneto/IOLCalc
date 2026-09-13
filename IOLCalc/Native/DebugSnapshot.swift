@@ -128,6 +128,21 @@ enum DebugSnapshot {
         }
         ok = ok && store2.cases.isEmpty && CaseStore(fileURL: url).cases.isEmpty
         log.append("deleted count=\(CaseStore(fileURL: url).cases.count) file=\(url.path)")
+        // exportar → importar em outra loja
+        let store3 = CaseStore(fileURL: url)
+        let c3 = store3.saveNew(from: model)
+        let exportURL = FileManager.default.temporaryDirectory.appendingPathComponent(c3.fileName)
+        do {
+            try CaseFile.encoder.encode(CaseFile(cases: [c3])).write(to: exportURL, options: .atomic)
+            let url4 = FileManager.default.temporaryDirectory.appendingPathComponent("iol-cases-import-\(UUID().uuidString).json")
+            let store4 = CaseStore(fileURL: url4)
+            let n1 = try store4.importCases(from: exportURL)
+            let n2 = try store4.importCases(from: exportURL) // repetido: nada novo
+            ok = ok && n1 == 1 && n2 == 0 && store4.cases.first?.snapshot == model.snapshot()
+            log.append("export/import n1=\(n1) n2=\(n2) equal=\(store4.cases.first?.snapshot == model.snapshot())")
+            try? FileManager.default.removeItem(at: url4)
+        } catch { ok = false; log.append("export/import error: \(error)") }
+        try? FileManager.default.removeItem(at: exportURL)
         log.append(ok ? "OK" : "FAIL")
         try? FileManager.default.removeItem(at: url)
         try? log.joined(separator: "\n").write(toFile: out, atomically: true, encoding: .utf8)
