@@ -48,7 +48,10 @@ enum DebugSnapshot {
             model.fillSample()
             let page = CalculatorPage(model: model, store: CaseStore(fileURL: FileManager.default.temporaryDirectory.appendingPathComponent("phone-snapshot-cases.json")),
                                       showReport: .constant(false), showCases: .constant(false))
-            let renderer = ImageRenderer(content: CompactWidthProvider { page }.frame(width: 390).background(Theme.bg))
+            let width = max(320, d.double(forKey: "iol_snapshot_width") == 0 ? 390 : d.double(forKey: "iol_snapshot_width"))
+            // (sem o CompactWidthProvider: o GeometryReader dele não tem altura própria no ImageRenderer)
+            let renderer = ImageRenderer(content: page.environment(\.isCompactWidth, width < CompactWidthProvider<EmptyView>.threshold)
+                                            .frame(width: width).background(Theme.bg))
             renderer.scale = 1.5 // a página inteira é muito alta para passar por TIFF em 2×
             if let cg = renderer.cgImage, let dest = CGImageDestinationCreateWithURL(URL(fileURLWithPath: path) as CFURL, UTType.png.identifier as CFString, 1, nil) {
                 CGImageDestinationAddImage(dest, cg, nil)

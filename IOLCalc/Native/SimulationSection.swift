@@ -114,8 +114,8 @@ struct SimulationScene {
         farPolygons: [poly([(0.0, 0.0), (1.0, 0.0), (1.0, 0.73), (0.72, 0.62), (0.53, 0.50), (0.30, 0.54), (0.0, 0.60)])],
         nearPolygons: [poly([(0.452, 0.515), (0.567, 0.540), (0.585, 0.62), (0.60, 0.72), (0.585, 0.90), (0.56, 1.0), (0.27, 1.0),
                              (0.30, 0.86), (0.34, 0.72), (0.37, 0.63), (0.42, 0.62), (0.455, 0.57)])],
-        phoneScreen: Quad((0.4667, 0.5296), (0.5631, 0.5583), (0.4071, 0.8870), (0.5161, 0.9259)),
-        midScreen: Quad((0.3083, 0.3500), (0.5167, 0.3407), (0.3173, 0.5583), (0.5262, 0.5278)),
+        phoneScreen: Quad((0.4665, 0.5263), (0.5677, 0.5627), (0.3988, 0.8854), (0.5183, 0.9360)),
+        midScreen: Quad((0.3083, 0.3507), (0.5171, 0.3412), (0.3166, 0.5606), (0.5272, 0.5311)),
         lights: [])
 
     /// Direção à noite (imagem gerada com o Gemini a partir da descrição do usuário).
@@ -233,15 +233,24 @@ struct SimulationSceneView: View {
             l.scaleBy(x: s, y: s)
             drawScene(&l, photo: photo)
         }
+        // Máscaras com borda suave (≈ 6 px da foto): o limite entre uma camada nítida e outra desfocada
+        // deixava uma emenda dura na borda dos polígonos.
+        let feather = 6 * s
         var farCtx = ctx
-        farCtx.clip(to: scene.path(scene.farPolygons, width: W * s, height: H * s))
+        farCtx.clipToLayer { m in
+            m.addFilter(.blur(radius: feather))
+            m.fill(scene.path(scene.farPolygons, width: W * s, height: H * s), with: .color(.black))
+        }
         farCtx.drawLayer { l in
             if sigma.far > 0.3 { l.addFilter(.blur(radius: sigma.far)) }
             l.scaleBy(x: s, y: s)
             drawScene(&l, photo: photo)
         }
         var nearCtx = ctx
-        nearCtx.clip(to: scene.path(scene.nearPolygons, width: W * s, height: H * s))
+        nearCtx.clipToLayer { m in
+            m.addFilter(.blur(radius: feather))
+            m.fill(scene.path(scene.nearPolygons, width: W * s, height: H * s), with: .color(.black))
+        }
         nearCtx.drawLayer { l in
             if sigma.near > 0.3 { l.addFilter(.blur(radius: sigma.near)) }
             l.scaleBy(x: s, y: s)
@@ -332,7 +341,7 @@ struct SimulationSceneView: View {
             return y + bh + fs * 0.6
         }
         var y = bar.maxY + fs * 0.8
-        y = bubble(["Bom dia! Sua cirurgia", "ficou para quinta, 8h30."], y: y, mine: false)
+        y = bubble(["Bom dia! Sua cirurgia", "ficou para quinta,", "às 8h30."], y: y, mine: false)
         y = bubble(["Chegar em jejum", "de 8 horas."], y: y, mine: false)
         _ = bubble(["Combinado, obrigada!"], y: y, mine: true)
         c.draw(c.resolve(Text("08:12").font(.system(size: fs * 0.7)).foregroundColor(night ? Color(hex: 0x8696a0) : Color(hex: 0x667781))),

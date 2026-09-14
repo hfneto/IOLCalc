@@ -10,8 +10,25 @@ struct NativeCalculatorView: View {
     @State private var showCases = false
 
     var body: some View {
-        ScrollView {
-            CalculatorPage(model: model, store: store, showReport: $showReport, showCases: $showCases)
+        ScrollViewReader { proxy in
+            ScrollView {
+                CalculatorPage(model: model, store: store, showReport: $showReport, showCases: $showCases)
+            }
+            #if os(iOS)
+            // Fundo translúcido atrás da barra de status (o conteúdo rola por baixo do relógio): a
+            // faixa de altura zero fica logo abaixo da área segura e o fundo se estende para cima.
+            .safeAreaInset(edge: .top, spacing: 0) {
+                Color.clear.frame(height: 0).background(.ultraThinMaterial)
+            }
+            #endif
+            #if DEBUG
+            // `-iol_scroll_section <1…8>`: rola até a seção ao abrir (capturas no simulador).
+            .onAppear {
+                let n = UserDefaults.standard.integer(forKey: "iol_scroll_section")
+                guard n > 0 else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { proxy.scrollTo(n, anchor: .top) }
+            }
+            #endif
         }
         .background(Theme.bg)
         #if os(iOS)
@@ -33,14 +50,14 @@ struct CalculatorPage: View {
     var body: some View {
         VStack(spacing: 16) {
             topBar
-            BiometrySection(model: model)
-            LensSection(model: model)
-            PowerSection(model: model)
-            CalculatorsSection(model: model)
-            DefocusSection(model: model)
-            CompareDrawer(model: model)
-            SimulationSection(model: model)
-            ToricSection(model: model)
+            BiometrySection(model: model).id(1)
+            LensSection(model: model).id(2)
+            PowerSection(model: model).id(3)
+            CalculatorsSection(model: model).id(4)
+            DefocusSection(model: model).id(5)
+            CompareDrawer(model: model).id(6)
+            SimulationSection(model: model).id(7)
+            ToricSection(model: model).id(8)
             MutedText("Recomendação por AL: olho curto (<22 mm) → Hoffer Q / Haigis / Castrop · médio → todas · longo (>26 mm) → Holladay 1 com ajuste Wang-Koch / T2 / Haigis / Castrop. A sugestão é a mediana das fórmulas recomendadas.", size: 11.5)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -146,6 +163,7 @@ private struct BiometryCard: View {
 struct LensSection: View {
     @Bindable var model: CalculatorModel
     @State private var showAdvanced = false
+    @Environment(\.isCompactWidth) private var compact
 
     var body: some View {
         SectionCard(title: "2 · Lentes e alvo", trailing: AnyView(methodPicker)) {
@@ -182,15 +200,35 @@ struct LensSection: View {
         }
     }
 
+    /// No iPhone o rótulo fica em cima e o seletor ocupa a largura toda (numa linha só ele ficava
+    /// espremido e o título do método quebrava em várias linhas sobre o texto vizinho).
     private var methodPicker: some View {
-        HStack(spacing: 8) {
+        AdaptiveHStack(spacing: 8) {
             MutedText("Biometria por", size: 12.5)
-            Picker("", selection: $model.method) {
-                ForEach(BiometryMethod.allCases) { Text($0.title).tag($0) }
+            HStack(spacing: 8) {
+                if compact {
+                    // O Picker de menu quebra o título longo em várias linhas; no iPhone o rótulo
+                    // visível é curto e o menu mostra os títulos completos.
+                    Menu {
+                        Picker("", selection: $model.method) {
+                            ForEach(BiometryMethod.allCases) { Text($0.title).tag($0) }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(model.method.compactTitle)
+                            Image(systemName: "chevron.up.chevron.down").font(.caption2.weight(.semibold))
+                        }
+                    }
+                    .fixedSize()
+                } else {
+                    Picker("", selection: $model.method) {
+                        ForEach(BiometryMethod.allCases) { Text($0.title).tag($0) }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                }
+                Chip(text: "ΔA " + Num.fmt(model.currentDeltaA, signed: true))
             }
-            .labelsHidden()
-            .compactFixedSize()
-            Chip(text: "ΔA " + Num.fmt(model.currentDeltaA, signed: true))
         }
     }
 
@@ -370,4 +408,15 @@ private struct PowerPlanView: View {
 
 #Preview {
     NativeCalculatorView()
+}
+
+extension BiometryMethod {
+    /// Título curto para o rótulo do seletor no iPhone.
+    var compactTitle: String {
+        switch self {
+        case .optical: return "Biometria óptica"
+        case .immersion: return "Ultrassom de imersão"
+        case .contact: return "Ultrassom de contato"
+        }
+    }
 }

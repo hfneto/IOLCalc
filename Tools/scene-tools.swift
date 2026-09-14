@@ -97,5 +97,34 @@ case "screen": // cantos de uma tela uniforme: args imagem, seedX, seedY, toler�
     let tl = ext { -$0.0 - $0.1 }, tr = ext { $0.0 - $0.1 }, bl = ext { -$0.0 + $0.1 }, br = ext { $0.0 + $0.1 }
     let W = Double(w), H = Double(h)
     print(String(format: "area=%d TL(%.4f, %.4f) TR(%.4f, %.4f) BL(%.4f, %.4f) BR(%.4f, %.4f)", pts.count, Double(tl.0)/W, Double(tl.1)/H, Double(tr.0)/W, Double(tr.1)/H, Double(bl.0)/W, Double(bl.1)/H, Double(br.0)/W, Double(br.1)/H))
+    // Ajuste por retas: cantos arredondados e entalhes encolhem os extremos. Para cada borda do
+    // quadrilátero inicial, os pontos do contorno perto dela (faixa de 8 px, 15–85 % do comprimento)
+    // são ajustados por uma reta (PCA) e os cantos ficam na interseção das retas vizinhas.
+    var inRegion = [Bool](repeating: false, count: w*h); for (x, y) in pts { inRegion[y*w+x] = true }
+    var boundary: [(Double, Double)] = []
+    for (x, y) in pts {
+        for (nx, ny) in [(x+1,y),(x-1,y),(x,y+1),(x,y-1)] where nx < 0 || ny < 0 || nx >= w || ny >= h || !inRegion[ny*w+nx] {
+            boundary.append((Double(x) + 0.5, Double(y) + 0.5)); break
+        }
+    }
+    func fitLine(_ P: (Int, Int), _ Q: (Int, Int)) -> (Double, Double, Double)? { // reta a·x + b·y = c
+        let px = Double(P.0), py = Double(P.1), dx = Double(Q.0) - px, dy = Double(Q.1) - py
+        let len = (dx*dx + dy*dy).squareRoot(); let ux = dx/len, uy = dy/len, nx = -uy, ny = ux
+        let sel = boundary.filter { p in let t = ((p.0-px)*ux + (p.1-py)*uy)/len; let d = (p.0-px)*nx + (p.1-py)*ny; return t > 0.15 && t < 0.85 && abs(d) < 8 }
+        guard sel.count > 20 else { return nil }
+        let mx = sel.map { $0.0 }.reduce(0, +)/Double(sel.count), my = sel.map { $0.1 }.reduce(0, +)/Double(sel.count)
+        var sxx = 0.0, sxy = 0.0, syy = 0.0
+        for p in sel { sxx += (p.0-mx)*(p.0-mx); sxy += (p.0-mx)*(p.1-my); syy += (p.1-my)*(p.1-my) }
+        // direção principal (autovetor maior da covariância)
+        let theta = 0.5 * atan2(2*sxy, sxx - syy); let dxx = cos(theta), dyy = sin(theta)
+        let a = -dyy, b = dxx; return (a, b, a*mx + b*my)
+    }
+    func cross(_ l1: (Double, Double, Double), _ l2: (Double, Double, Double)) -> (Double, Double) {
+        let det = l1.0*l2.1 - l2.0*l1.1; return ((l1.2*l2.1 - l2.2*l1.1)/det, (l1.0*l2.2 - l2.0*l1.2)/det)
+    }
+    if let lt = fitLine(tl, tr), let lr = fitLine(tr, br), let lb = fitLine(bl, br), let ll = fitLine(tl, bl) {
+        let ftl = cross(ll, lt), ftr = cross(lr, lt), fbl = cross(ll, lb), fbr = cross(lr, lb)
+        print(String(format: "fit    TL(%.4f, %.4f) TR(%.4f, %.4f) BL(%.4f, %.4f) BR(%.4f, %.4f)", ftl.0/W, ftl.1/H, ftr.0/W, ftr.1/H, fbl.0/W, fbl.1/H, fbr.0/W, fbr.1/H))
+    } else { print("fit    (contorno insuficiente em alguma borda)") }
 default: break
 }

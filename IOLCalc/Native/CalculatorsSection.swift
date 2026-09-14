@@ -38,15 +38,23 @@ struct FlowButtons<Content: View>: View {
     }
 }
 
-/// Layout de fluxo simples (esquerda → direita, depois quebra).
+/// Layout de fluxo simples (esquerda → direita, depois quebra). Um item mais largo que o contêiner
+/// recebe a largura do contêiner e quebra o texto em vez de estourar a borda.
 struct FlowLayout: Layout {
     var spacing: CGFloat = 8
+
+    private func fit(_ s: LayoutSubview, in width: CGFloat) -> (CGSize, ProposedViewSize) {
+        let sz = s.sizeThatFits(.unspecified)
+        guard width.isFinite, sz.width > width else { return (sz, .unspecified) }
+        let p = ProposedViewSize(width: width, height: nil)
+        return (s.sizeThatFits(p), p)
+    }
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let width = proposal.width ?? .infinity
         var x: CGFloat = 0, y: CGFloat = 0, rowH: CGFloat = 0, maxX: CGFloat = 0
         for s in subviews {
-            let sz = s.sizeThatFits(.unspecified)
+            let (sz, _) = fit(s, in: width)
             if x > 0, x + sz.width > width { x = 0; y += rowH + spacing; rowH = 0 }
             x += sz.width + spacing; rowH = max(rowH, sz.height); maxX = max(maxX, x - spacing)
         }
@@ -56,9 +64,9 @@ struct FlowLayout: Layout {
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
         var x = bounds.minX, y = bounds.minY, rowH: CGFloat = 0
         for s in subviews {
-            let sz = s.sizeThatFits(.unspecified)
+            let (sz, p) = fit(s, in: bounds.width)
             if x > bounds.minX, x + sz.width > bounds.maxX { x = bounds.minX; y += rowH + spacing; rowH = 0 }
-            s.place(at: CGPoint(x: x, y: y), proposal: .unspecified)
+            s.place(at: CGPoint(x: x, y: y), proposal: p)
             x += sz.width + spacing; rowH = max(rowH, sz.height)
         }
     }

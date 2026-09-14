@@ -48,11 +48,14 @@ extension EnvironmentValues {
 /// Lê o size class da plataforma e publica `isCompactWidth` para toda a subárvore.
 struct CompactWidthProvider<Content: View>: View {
     @ViewBuilder let content: Content
+    /// Abaixo desta largura a página de duas colunas não cabe (iPad na vertical tem 834 pt; a página
+    /// foi desenhada para ≥ 1100): usa-se o layout de coluna única do iPhone.
+    static var threshold: CGFloat { 1000 }
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var sizeClass
-    private var compact: Bool { sizeClass == .compact }
+    private var forced: Bool { sizeClass == .compact }
     #else
-    private var compact: Bool {
+    private var forced: Bool {
         #if DEBUG
         UserDefaults.standard.bool(forKey: "iol_force_compact")
         #else
@@ -60,7 +63,11 @@ struct CompactWidthProvider<Content: View>: View {
         #endif
     }
     #endif
-    var body: some View { content.environment(\.isCompactWidth, compact) }
+    var body: some View {
+        GeometryReader { g in
+            content.environment(\.isCompactWidth, forced || g.size.width < Self.threshold)
+        }
+    }
 }
 
 /// Largura fixa (tamanho ideal) só quando há espaço; na largura compacta o controle pode encolher.
