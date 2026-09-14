@@ -171,7 +171,8 @@ final class CaseStore {
     private func attachCloud() {
         Task.detached(priority: .utility) { [weak self] in
             let container = FileManager.default.url(forUbiquityContainerIdentifier: CaseStore.containerID)
-            await MainActor.run { self?.cloudReady(container) }
+            guard let self else { return }
+            await MainActor.run { self.cloudReady(container) }
         }
     }
 
