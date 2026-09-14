@@ -70,7 +70,9 @@ seção 7 (planejamento tórico com diagrama arrastável), todas calculando com 
   `-iol_sim_snapshot <png>` (com `-iol_sim_night YES`, `-iol_sim_astig YES`) renderizam as seções 7 e 6;
   `-iol_report_snapshot <png>` e `-iol_report_pdf <pdf>` renderizam o relatório;
   `-iol_phone_snapshot <png>` com `-iol_force_compact YES` renderiza a página inteira na largura de
-  iPhone (390 pt) para conferir o layout compacto no Mac; `-iol_cases_test <txt>`
+  iPhone (390 pt) para conferir o layout compacto no Mac (`-iol_snapshot_width 1100` renderiza a
+  página na largura do Mac); no simulador, `-iol_scroll_section <1…8>` rola até a seção ao abrir;
+  `-iol_cases_test <txt>`
   faz um ciclo salvar/atualizar/recarregar/apagar num JSON temporário e grava "OK" no fim;
   `-iol_no_keychain YES` pula o Keychain (um binário recém-compilado faria o sistema pedir confirmação
   e travaria a captura). Se o app já estiver aberto pelo Xcode, o macOS não abre a janela de uma

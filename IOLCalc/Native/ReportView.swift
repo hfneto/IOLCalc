@@ -26,43 +26,56 @@ struct ReportView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(blocks.enumerated()), id: \.offset) { $0.element }
+        }
+        .modifier(ReportStyle())
+        .padding(24)
+        .background(Color.white)
+    }
+
+    /// As partes do relatório, na ordem. O PDF pagina bloco a bloco (um bloco não é partido entre
+    /// duas páginas, a não ser que seja mais alto do que uma página inteira).
+    var blocks: [AnyView] {
+        var out: [AnyView] = []
+        out.append(AnyView(VStack(alignment: .leading, spacing: 0) {
             Text("Relatório de Planejamento de LIO").font(.system(size: 20, weight: .bold)).foregroundStyle(ink)
             let name = model.patientName.trimmingCharacters(in: .whitespacesAndNewlines)
             if !name.isEmpty {
                 Text("Paciente: \(name)").font(.system(size: 15, weight: .bold)).foregroundStyle(ink).padding(.top, 4)
             }
             Text("Catarata · \(Self.stamp(date)) · Calculadora de LIO").font(.system(size: 12)).foregroundStyle(Theme.muted).padding(.top, 2)
-
+        }))
+        out.append(AnyView(VStack(alignment: .leading, spacing: 0) {
             heading("1 · Biometria")
             biometryTable
-
+        }))
+        out.append(AnyView(VStack(alignment: .leading, spacing: 0) {
             heading("2 · Poder da LIO")
             HStack(alignment: .top, spacing: 16) {
                 ForEach(eyes) { powerBlock($0) }
             }
-
+        }))
+        out.append(AnyView(VStack(alignment: .leading, spacing: 0) {
             heading(eyes.count == 2 ? "3 · Visão binocular prevista" : "3 · Visão prevista (\(eyes[0].rawValue))")
             binocularBlock
-
-            if !toricEyes.isEmpty {
+        }))
+        if !toricEyes.isEmpty {
+            out.append(AnyView(VStack(alignment: .leading, spacing: 0) {
                 heading("4 · Planejamento tórico")
                 HStack(alignment: .top, spacing: 16) {
                     ForEach(toricEyes) { toricBlock($0) }
                 }
-            }
-
-            if let cmp = compareRows {
+            }))
+        }
+        if let cmp = compareRows {
+            out.append(AnyView(VStack(alignment: .leading, spacing: 0) {
                 heading("\(toricEyes.isEmpty ? 4 : 5) · Comparação de lentes — \(model.compareEye.rawValue)")
                 table(headers: ["Lente", "Poder", "Residual", "Longe", "66 cm", "40 cm", "Disfotopsia"], rows: cmp, leadingLabel: true, compact: true, firstColumnMinWidth: 150)
                 sub("AV monocular prevista do \(model.compareEye.rawValue), cada lente com a própria constante A" + (model.astigmatismOn ? " · astigmatismo residual considerado" : "") + ".")
-            }
-
-            disclaimer
+            }))
         }
-        .font(.system(size: 13))
-        .foregroundStyle(ink)
-        .padding(24)
-        .background(Color.white)
+        out.append(AnyView(disclaimer))
+        return out
     }
 
     // MARK: blocos
@@ -233,6 +246,13 @@ struct ReportView: View {
     }
 }
 
+/// Fonte e cor base do relatório (aplicadas também a cada bloco renderizado em separado no PDF).
+struct ReportStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content.font(.system(size: 13)).foregroundStyle(Theme.ink)
+    }
+}
+
 // MARK: - PDF
 
 enum ReportPDF {
@@ -240,30 +260,55 @@ enum ReportPDF {
     static let pageSize = CGSize(width: 595, height: 842)
     static let margin: CGFloat = 20
 
-    /// Renderiza o relatório em PDF A4 paginado (o conteúdo é desenhado uma vez por página,
-    /// deslocado). Deve rodar na main actor (`ImageRenderer`).
+    /// Renderiza o relatório em PDF A4 paginado bloco a bloco: cada seção é medida e desenhada em
+    /// separado; se não couber no resto da página, vai inteira para a próxima (só um bloco mais alto
+    /// do que a página é partido). Deve rodar na main actor (`ImageRenderer`).
     @MainActor
     static func make(model: CalculatorModel, date: Date = Date()) -> Data {
+        let inner: CGFloat = 24
         let width = pageSize.width - 2 * margin
-        let renderer = ImageRenderer(content: ReportView(model: model, date: date).frame(width: width))
+        let usable = pageSize.height - 2 * margin
         let data = NSMutableData()
-        renderer.render { size, draw in
-            var box = CGRect(origin: .zero, size: pageSize)
-            guard let consumer = CGDataConsumer(data: data), let pdf = CGContext(consumer: consumer, mediaBox: &box, nil) else { return }
-            let usable = pageSize.height - 2 * margin
-            let pages = max(1, Int((size.height / usable).rounded(.up)))
-            for page in 0..<pages {
-                pdf.beginPDFPage(nil)
-                pdf.saveGState()
-                // recorta à área útil e desloca o conteúdo para a página; o CGContext do PDF tem origem embaixo
-                pdf.clip(to: CGRect(x: margin, y: margin, width: width, height: usable))
-                pdf.translateBy(x: margin, y: pageSize.height - margin - size.height + CGFloat(page) * usable)
-                draw(pdf)
-                pdf.restoreGState()
-                pdf.endPDFPage()
-            }
-            pdf.closePDF()
+        var box = CGRect(origin: .zero, size: pageSize)
+        guard let consumer = CGDataConsumer(data: data), let pdf = CGContext(consumer: consumer, mediaBox: &box, nil) else { return Data() }
+        let blocks = ReportView(model: model, date: date).blocks
+        var y: CGFloat = 0          // posição do cursor na página atual (de cima para baixo)
+        var open = false            // há página começada
+        func newPage() {
+            if open { pdf.endPDFPage() }
+            pdf.beginPDFPage(nil)
+            // fundo branco da área útil
+            pdf.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
+            pdf.fill(CGRect(x: margin, y: margin, width: width, height: usable))
+            open = true; y = 0
         }
+        for (i, block) in blocks.enumerated() {
+            let view = block.modifier(ReportStyle())
+                .padding(.horizontal, inner)
+                .padding(.top, i == 0 ? inner : 0)
+                .padding(.bottom, i == blocks.count - 1 ? inner : 0)
+                .frame(width: width, alignment: .leading)
+                .background(Color.white)
+            let renderer = ImageRenderer(content: view)
+            renderer.render { size, draw in
+                if !open || (y > 0 && y + size.height > usable) { newPage() }
+                var drawn: CGFloat = 0
+                while drawn < size.height {
+                    let room = usable - y
+                    pdf.saveGState()
+                    pdf.clip(to: CGRect(x: margin, y: margin, width: width, height: room))
+                    // origem do PDF embaixo: o topo do bloco fica em (pageHeight − margin − y), deslocado do trecho já desenhado
+                    pdf.translateBy(x: margin, y: pageSize.height - margin - y - size.height + drawn)
+                    draw(pdf)
+                    pdf.restoreGState()
+                    let piece = min(room, size.height - drawn)
+                    drawn += piece; y += piece
+                    if drawn < size.height { newPage() }
+                }
+            }
+        }
+        if open { pdf.endPDFPage() }
+        pdf.closePDF()
         return data as Data
     }
 

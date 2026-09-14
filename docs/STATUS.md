@@ -121,6 +121,30 @@ vez e depois entrada automática por Face ID.
   container no portal — se reclamar do perfil, "+ Capability › iCloud › iCloud Documents" com o
   container acima. iCloud Drive e iCloud Keychain precisam estar ligados no Mac e no iPhone.
 
+## Rodada de refinamento (14/09)
+- Simulação: cantos das telas do celular (dia) e do notebook remedidos com o novo ajuste por retas
+  do `Tools/scene-tools.swift screen` (linha "fit"): a tela desenhada vai até a borda física, sem
+  a faixa cinza que sobrava à direita e em cima; a mensagem do celular em 3 linhas cabe inteira.
+  Máscaras "longe"/"perto" com borda suave (`clipToLayer` + blur de 6 px da foto). A tela do GPS
+  (noite) fica com os cantos manuais: a mão cobre parte dela e o ajuste automático erra.
+- iPhone (conferido no simulador iPhone 17 com `-iol_scroll_section <n>`): o seletor do método de
+  biometria virou `Menu` com rótulo curto (`BiometryMethod.compactTitle`) — o `Picker` de menu
+  quebrava o título longo em 3 linhas sobre o texto vizinho; `FlowLayout` dá a largura do contêiner a
+  um item mais largo que ele (o botão do ESCRS estourava o cartão); faixa translúcida atrás da barra
+  de status (`safeAreaInset` com fundo `ultraThinMaterial`).
+- iPad na vertical (834 pt): a página de duas colunas estourava dos dois lados. `CompactWidthProvider`
+  agora mede a largura (`GeometryReader`) e usa o layout de coluna única abaixo de 1000 pt, além do
+  size class. iPad na horizontal e Mac seguem com duas colunas.
+- Relatório em PDF: paginado bloco a bloco (`ReportView.blocks`, `ReportPDF.make`): cada seção é
+  medida e desenhada em separado e vai inteira para a próxima página quando não cabe; só um bloco
+  mais alto que a página é partido. Conferido com `-iol_report_pdf` (2 páginas, rasterizadas com
+  PDFKit).
+- Depuração: `-iol_snapshot_width <pt>` no `-iol_phone_snapshot` renderiza a página em qualquer
+  largura (1100 = Mac). A captura da janela (`-iol_snapshot`) saiu em branco nesta rodada (causa não
+  investigada; o render por `ImageRenderer` e o simulador cobriram a revisão).
+- Ficou de fora: força do desfoque/arrasto (subjetivo, o usuário não pediu mudança) e regenerar as
+  fotos com telas mais frontais.
+
 ## Pendências do usuário
 1. Abrir o app no Mac, colar a chave da API (console.anthropic.com) e ler um laudo real; no iPhone a
    chave chega pelo iCloud Keychain (nada a digitar) e o app pede Face ID ao abrir.
@@ -134,15 +158,13 @@ vez e depois entrada automática por Face ID.
    apagar o worktree antigo (comando acima).
 
 ## Próximos passos sugeridos
-- Roadmap de migração concluído. Próximo: a rodada de refinamento combinada (ver memória
-  "iolcalc-refinamento-final": alinhamento das telas na simulação, revisão geral da tela e do
-  relatório, iPhone), depois distribuição (Apple ID/TestFlight).
+- Roadmap de migração e rodada de refinamento concluídos. Próximo: uso real por algumas semanas
+  (TestFlight), política de privacidade, capturas e ficha da App Store; versão em inglês como 1.1
+  (plano combinado em 14/09, ver conversa).
 - Casos salvos: iCloud feito em 13/09. Se um dia houver conflito de versões do iCloud
   (`NSFileVersion`), o app ignora; o arquivo é pequeno e de um único usuário.
 - TestFlight: agora possível (`docs/DISTRIBUICAO.md`), para instalar no iPhone sem cabo e sem o
   limite de 7 dias.
-- Relatório: no PDF, o corte de página pode cair no meio de um bloco (é o `ImageRenderer` deslocado
-  por página). Se incomodar, renderizar as seções separadamente e paginar por bloco.
 - Seção 4 (calculadoras oficiais) na tela nativa: reaproveitar `CalculatorFillSheet` com os
   dados do `CalculatorModel`.
 - Ergonomia da seção 6 no iPhone: os quadros ficam em coluna única (300 pt mínimos); avaliar
