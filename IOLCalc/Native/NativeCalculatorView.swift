@@ -1,18 +1,45 @@
 import SwiftUI
 import IOLCore
+import UniformTypeIdentifiers
 
 /// A calculadora inteira em SwiftUI: biometria, lentes e alvo, poder da LIO, calculadoras oficiais,
 /// defocus e binocular, comparador, simulação visual e tórica, calculando com o `IOLCore`.
 struct NativeCalculatorView: View {
     @State private var model = CalculatorModel()
     @State private var store = CaseStore(useCloud: true)
+    @State private var reader = AIReaderState()
     @State private var showReport = false
     @State private var showCases = false
+    @State private var showSettings = false
+    @Environment(\.isCompactWidth) private var compact
 
     var body: some View {
+        // O provedor de largura fica DENTRO do inspector: com o laudo aberto ao lado, a coluna da
+        // calculadora encolhe e passa ao layout de uma coluna (senão a página de duas colunas
+        // estourava e era cortada dos dois lados).
+        CompactWidthProvider { page }
+        // O laudo lido fica ao lado da calculadora (Mac/iPad) ou numa folha (iPhone), para conferir
+        // os valores linha a linha antes de calcular.
+        .inspector(isPresented: $reader.showLaudo) {
+            LaudoInspector(files: reader.laudo, onOpenFile: { reader.open($0) }, onClose: { reader.showLaudo = false })
+                .inspectorColumnWidth(min: 320, ideal: 440, max: 800)
+        }
+        .onChange(of: reader.laudoJustRead) { _, just in
+            guard just else { return }
+            reader.laudoJustRead = false
+            // Com largura (janela/iPad), abre sozinho; no iPhone a folha cobriria os campos — fica
+            // no botão "Ver laudo". `compact` aqui é o da janela inteira (provedor do RootView).
+            if !compact { reader.showLaudo = true }
+        }
+        .sheet(isPresented: $showReport) { NativeReportSheet(model: model) }
+        .sheet(isPresented: $showCases) { CasesSheet(model: model, store: store, reader: reader) }
+        .sheet(isPresented: $showSettings) { SettingsSheet(reader: reader) }
+    }
+
+    private var page: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                CalculatorPage(model: model, store: store, showReport: $showReport, showCases: $showCases)
+                CalculatorPage(model: model, store: store, reader: reader, showReport: $showReport, showCases: $showCases, showSettings: $showSettings)
             }
             #if os(iOS)
             // Fundo translúcido atrás da barra de status (o conteúdo rola por baixo do relógio): a
@@ -23,7 +50,15 @@ struct NativeCalculatorView: View {
             #endif
             #if DEBUG
             // `-iol_scroll_section <1…8>`: rola até a seção ao abrir (capturas no simulador).
+            // `-iol_laudo_file <caminho>`: abre o arquivo no painel do laudo, como se tivesse sido lido.
             .onAppear {
+                if let path = UserDefaults.standard.string(forKey: "iol_laudo_file"),
+                   let data = FileManager.default.contents(atPath: path) {
+                    let url = URL(fileURLWithPath: path)
+                    reader.laudo = [PickedFile(data: data, name: url.lastPathComponent, type: UTType(filenameExtension: url.pathExtension))]
+                    reader.status = .init(kind: .ok, text: "Laudo lido. Confira os valores antes de calcular — abra o laudo ao lado com \"Ver laudo\".")
+                    reader.laudoJustRead = true
+                }
                 let n = UserDefaults.standard.integer(forKey: "iol_scroll_section")
                 guard n > 0 else { return }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { proxy.scrollTo(n, anchor: .top) }
@@ -34,8 +69,6 @@ struct NativeCalculatorView: View {
         #if os(iOS)
         .scrollDismissesKeyboard(.interactively)
         #endif
-        .sheet(isPresented: $showReport) { NativeReportSheet(model: model) }
-        .sheet(isPresented: $showCases) { CasesSheet(model: model, store: store) }
     }
 }
 
@@ -43,14 +76,16 @@ struct NativeCalculatorView: View {
 struct CalculatorPage: View {
     @Bindable var model: CalculatorModel
     let store: CaseStore
+    var reader = AIReaderState()
     @Binding var showReport: Bool
     @Binding var showCases: Bool
+    var showSettings: Binding<Bool> = .constant(false)
     @Environment(\.isCompactWidth) private var compact
 
     var body: some View {
         VStack(spacing: 16) {
             topBar
-            BiometrySection(model: model).id(1)
+            BiometrySection(model: model, reader: reader).id(1)
             LensSection(model: model).id(2)
             PowerSection(model: model).id(3)
             CalculatorsSection(model: model).id(4)
@@ -78,6 +113,20 @@ struct CalculatorPage: View {
         HStack(spacing: 8) {
             PillButton(title: "Relatório", systemImage: "doc.text", primary: true) { showReport = true }
             PillButton(title: store.contains(model.loadedCaseID) ? "Casos · aberto" : "Casos", systemImage: "tray.full") { showCases = true }
+            if reader.laudoLoading {
+                PillButton(title: "Laudo · baixando…", systemImage: "icloud.and.arrow.down") {}
+            } else if !reader.laudo.isEmpty {
+                PillButton(title: reader.showLaudo ? "Laudo · aberto" : "Laudo", systemImage: "doc.text.magnifyingglass") { reader.showLaudo.toggle() }
+            }
+            Button { showSettings.wrappedValue = true } label: {
+                Image(systemName: "gearshape").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.brand)
+                    .padding(.horizontal, 9).padding(.vertical, 8)
+                    .background(Color.white).clipShape(RoundedRectangle(cornerRadius: 9))
+                    .overlay(RoundedRectangle(cornerRadius: 9).stroke(Theme.line))
+            }
+            .buttonStyle(.plain)
+            .help("Configurações: lentes favoritas, leitura por IA e ajuda")
+            .accessibilityLabel("Configurações")
         }
         .fixedSize()
     }
@@ -90,6 +139,9 @@ struct CalculatorPage: View {
                 .padding(.horizontal, 10).padding(.vertical, 8)
                 .background(Color.white).clipShape(RoundedRectangle(cornerRadius: 8))
                 .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.line))
+                // Largura ideal limitada: o `ViewThatFits` mede o tamanho ideal, e o campo com o
+                // placeholder longo fazia a linha "caber" e estourar dos dois lados.
+                .frame(minWidth: 160, idealWidth: 360, maxWidth: .infinity)
         }
     }
 }
@@ -98,17 +150,24 @@ struct CalculatorPage: View {
 
 struct BiometrySection: View {
     @Bindable var model: CalculatorModel
-    @State private var reader = AIReaderState()
+    @Bindable var reader: AIReaderState
+    @Environment(\.isCompactWidth) private var compact
 
     var body: some View {
         SectionCard(title: "1 · Biometria", trailing: AnyView(
             HStack(spacing: 8) {
                 AIReadControls(model: model, reader: reader)
-                PillButton(title: "Limpar") { model.clearBiometry(); reader.status = nil }
+                PillButton(title: "Limpar") { model.clearBiometry(); reader.clear() }
             }
         )) {
             if let status = reader.status {
-                AIReadControls.StatusView(status: status)
+                AdaptiveHStack(alignment: .center, spacing: 8) {
+                    AIReadControls.StatusView(status: status)
+                    if !reader.laudo.isEmpty, !reader.showLaudo {
+                        PillButton(title: "Ver laudo", systemImage: "doc.text.magnifyingglass", primary: true) { reader.showLaudo = true }
+                            .fixedSize()
+                    }
+                }
             }
             EyePair { eye in
                 BiometryCard(eye: eye, form: binding(eye))
@@ -153,6 +212,7 @@ private struct BiometryCard: View {
                 }
                 .buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(Theme.brand)
                 .disabled(form.hasTK)
+                HelpButton(topic: .totalKeratometry)
             }
         }
     }
@@ -178,7 +238,10 @@ struct LensSection: View {
                 }
                 .padding(.top, 6)
             } label: {
-                MutedText("Ajuste da constante A por método · avançado")
+                HStack(spacing: 6) {
+                    MutedText("Ajuste da constante A por método · avançado")
+                    HelpButton(topic: .biometryMethod)
+                }
             }
             .tint(Theme.muted)
 
@@ -204,7 +267,10 @@ struct LensSection: View {
     /// espremido e o título do método quebrava em várias linhas sobre o texto vizinho).
     private var methodPicker: some View {
         AdaptiveHStack(spacing: 8) {
-            MutedText("Biometria por", size: 12.5)
+            HStack(spacing: 4) {
+                MutedText("Biometria por", size: 12.5)
+                HelpButton(topic: .biometryMethod)
+            }
             HStack(spacing: 8) {
                 if compact {
                     // O Picker de menu quebra o título longo em várias linhas; no iPhone o rótulo
@@ -240,21 +306,31 @@ struct LensSection: View {
 private struct LensCard: View {
     let eye: Eye
     @Bindable var model: CalculatorModel
+    @State private var showOther = false
 
     var body: some View {
         EyeCard(eye: eye, title: eye.rawValue) {
             VStack(alignment: .leading, spacing: 3) {
-                FieldLabel(text: "LIO")
-                LensPicker(selection: Binding(get: { model[eye].lensID }, set: { model.selectLens($0, for: eye) }))
+                HStack(spacing: 4) {
+                    FieldLabel(text: "LIO")
+                    HelpButton(topic: .lensChoice)
+                }
+                LensPicker(selection: Binding(get: { model[eye].lensID }, set: { model.selectLens($0, for: eye) }),
+                           custom: model[eye].custom, onOther: { showOther = true })
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             HStack(alignment: .top, spacing: 8) {
-                NumberField(label: "Constante A", text: Binding(get: { model[eye].aConstant }, set: { model[eye].aConstant = $0 }))
+                NumberField(label: "Constante A", text: Binding(get: { model[eye].aConstant }, set: { model[eye].aConstant = $0 }), help: .aConstant)
                 NumberField(label: "Alvo (D, equiv. esf.)", text: Binding(get: { model[eye].target }, set: { model.setTarget($0, for: eye) }))
             }
             if let l = model[eye].lens {
-                MutedText("\(l.manufacturer) · \(l.type) · A ref \(Num.fmt(l.aConstant)) · disfotopsia \(["baixa", "baixa-mod", "moderada", "alta"][l.dysphotopsia])")
+                MutedText("\(l.manufacturer) · \(l.type) · A ref \(Num.fmt(l.aConstant)) · disfotopsia \(["baixa", "baixa-mod", "moderada", "alta"][l.dysphotopsia])\(l.curveEstimated ? " · curva estimada" : "")")
             }
+        }
+        .sheet(isPresented: $showOther) {
+            LensChooserSheet(title: "Outra LIO · \(eye.rawValue)", initialCustom: model[eye].custom,
+                             onPick: { model.selectLens($0, for: eye) },
+                             onCustom: { model.selectCustomLens($0, for: eye) })
         }
     }
 }
@@ -265,7 +341,7 @@ struct PowerSection: View {
     let model: CalculatorModel
 
     var body: some View {
-        SectionCard(title: "3 · Poder da LIO") {
+        SectionCard(title: "3 · Poder da LIO", trailing: AnyView(HelpButton(topic: .powerSuggestion))) {
             EyePair { eye in
                 EyeCard(eye: eye, title: eye.rawValue) {
                     switch model.result(for: eye) {

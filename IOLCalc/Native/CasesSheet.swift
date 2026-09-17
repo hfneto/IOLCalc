@@ -5,6 +5,8 @@ import UniformTypeIdentifiers
 struct CasesSheet: View {
     let model: CalculatorModel
     @Bindable var store: CaseStore
+    /// Laudo da sessão (para guardar com o caso) e destino do laudo ao abrir um caso.
+    var reader: AIReaderState? = nil
     @Environment(\.dismiss) private var dismiss
     @State private var renaming: SavedCase?
     @State private var newName = ""
@@ -13,6 +15,13 @@ struct CasesSheet: View {
     @State private var importing = false
 
     private var loaded: SavedCase? { store.cases.first { $0.id == model.loadedCaseID } }
+    private var sessionLaudo: [PickedFile] { reader?.laudo ?? [] }
+
+    private func open(_ c: SavedCase) {
+        store.open(c, into: model)
+        reader?.loadLaudo(of: c, from: store)
+        dismiss()
+    }
 
     var body: some View {
         NavigationStack {
@@ -75,19 +84,27 @@ struct CasesSheet: View {
             FlowLayout(spacing: 8) {
                 if let loaded {
                     PillButton(title: "Atualizar “\(loaded.name)”", systemImage: "arrow.triangle.2.circlepath", primary: true) {
-                        store.update(from: model); show("Caso atualizado")
+                        // Só troca o laudo guardado quando a sessão leu um laudo novo; nunca apaga por omissão.
+                        let fresh = sessionLaudo.isEmpty || reader?.laudoCaseID == loaded.id ? nil : sessionLaudo
+                        store.update(from: model, laudo: fresh)
+                        if fresh != nil { reader?.laudoCaseID = loaded.id }
+                        show("Caso atualizado")
                     }
                     PillButton(title: "Salvar como novo", systemImage: "plus") {
-                        store.saveNew(from: model); show("Caso salvo")
+                        let c = store.saveNew(from: model, laudo: sessionLaudo)
+                        if !sessionLaudo.isEmpty { reader?.laudoCaseID = c.id }
+                        show("Caso salvo")
                     }
                 } else {
                     PillButton(title: "Salvar caso atual", systemImage: "square.and.arrow.down", primary: true) {
-                        store.saveNew(from: model); show("Caso salvo")
+                        let c = store.saveNew(from: model, laudo: sessionLaudo)
+                        if !sessionLaudo.isEmpty { reader?.laudoCaseID = c.id }
+                        show("Caso salvo")
                     }
                 }
                 if let flash { Text(flash).font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.okInk) }
             }
-            MutedText("O caso guarda biometria, lentes, alvos, régua, astigmatismo, planejamento tórico e comparador. O nome é o do paciente; renomeie pelo menu do caso. Para levar um caso ao outro aparelho, exporte (AirDrop, Arquivos, e-mail) e importe lá.", size: 11.5)
+            MutedText("O caso guarda biometria, lentes, alvos, régua, astigmatismo, planejamento tórico, comparador e o laudo lido (\(sessionLaudo.isEmpty ? "nenhum laudo nesta sessão" : "\(sessionLaudo.count) página\(sessionLaudo.count == 1 ? "" : "s") do laudo entram no caso")). O nome é o do paciente; renomeie pelo menu do caso. Casos e laudos sincronizam pelo iCloud; para levar a outro lugar, exporte (AirDrop, Arquivos, e-mail) e importe lá.", size: 11.5)
         }
         .padding(14)
         .background(Theme.card)
@@ -96,10 +113,10 @@ struct CasesSheet: View {
     private var list: some View {
         List {
             ForEach(store.cases) { c in
-                Button { store.open(c, into: model); dismiss() } label: { row(c) }
+                Button { open(c) } label: { row(c) }
                     .buttonStyle(.plain)
                     .contextMenu {
-                        Button("Abrir") { store.open(c, into: model); dismiss() }
+                        Button("Abrir") { open(c) }
                         Button("Renomear…") { newName = c.name; renaming = c }
                         ShareLink(item: store.export(c), preview: SharePreview(c.name)) { Label("Exportar…", systemImage: "square.and.arrow.up") }
                         Button("Apagar…", role: .destructive) { toDelete = c }
@@ -123,6 +140,7 @@ struct CasesSheet: View {
                 HStack(spacing: 6) {
                     Text(c.name).font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.ink)
                     if c.id == model.loadedCaseID { Chip(text: "aberto") }
+                    if c.hasLaudo { Chip(text: "laudo") }
                 }
                 MutedText("OD " + (c.summaryOD ?? "—") + " · OE " + (c.summaryOE ?? "—"))
                 MutedText(Self.date(c.updatedAt) + (c.createdAt != c.updatedAt ? " (criado " + Self.date(c.createdAt) + ")" : ""), size: 11)

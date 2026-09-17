@@ -43,7 +43,10 @@ private struct ToricCard: View {
                 MutedText(model.toricSourceLabel(eye), size: 11)
             }
             VStack(alignment: .leading, spacing: 3) {
-                FieldLabel(text: "Base do astigmatismo")
+                HStack(spacing: 4) {
+                    FieldLabel(text: "Base do astigmatismo")
+                    HelpButton(topic: .toricBase)
+                }
                 Picker("", selection: Binding(get: { cornealModel }, set: { model[toric: eye].modelOverride = $0 })) {
                     ForEach(CornealAstigmatismModel.allCases) { Text($0.title).tag($0) }
                 }
@@ -92,7 +95,10 @@ private struct ToricCard: View {
                 }
                 .padding(.top, 6)
             } label: {
-                MutedText("Plataforma e razão de toricidade · avançado")
+                HStack(spacing: 6) {
+                    MutedText("Plataforma e razão de toricidade · avançado")
+                    HelpButton(topic: .toricPlatform)
+                }
             }
             .tint(Theme.muted)
 

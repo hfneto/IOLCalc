@@ -9,7 +9,7 @@ struct SimulationSection: View {
     private var anyEye: Bool { model.eyeActive(.od) || model.eyeActive(.oe) }
 
     var body: some View {
-        SectionCard(title: "6 · Simulação visual") {
+        SectionCard(title: "6 · Simulação visual", trailing: AnyView(HelpButton(topic: .simulation))) {
             MutedText("Duas cenas com as três distâncias: de dia, numa cafeteria (celular na mão a 40 cm, e-mail no notebook a 66 cm, cardápio, quadros e a rua pela janela); à noite, dirigindo (celular na mão, GPS do carro a 66 cm, o carro à frente com a placa, semáforo, placas e luzes da cidade). Cada camada é desfocada pela AV binocular prevista naquela distância (lentes + residual + astigmatismo, se ligado). À noite entram a penalidade mesópica e os halos nas luzes.", size: 12.5)
             sceneBlock(.day)
             sceneBlock(.night)

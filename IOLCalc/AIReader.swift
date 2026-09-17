@@ -1,20 +1,12 @@
 import Foundation
 
-/// Pedido de leitura de um laudo, como a página o envia (mesmo formato que o antigo proxy recebia).
+/// Pedido de leitura de um laudo (arquivo já preparado pelo `UploadPrep`).
 struct AIReadRequest {
     var model: String
     var isPDF: Bool
     var mediaType: String
     /// Conteúdo do arquivo em base64, sem quebras de linha.
     var data: String
-
-    init?(body: Any) {
-        guard let d = body as? [String: Any], let data = d["data"] as? String, !data.isEmpty else { return nil }
-        self.data = data
-        model = (d["model"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? AIReader.defaultModel
-        isPDF = (d["is_pdf"] as? Bool) ?? ((d["is_pdf"] as? NSNumber)?.boolValue ?? false)
-        mediaType = (d["media_type"] as? String) ?? "image/jpeg"
-    }
 }
 
 enum AIReadError: LocalizedError {
@@ -27,13 +19,13 @@ enum AIReadError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .noKey: return "Configure a chave da API da Anthropic no app (Leitura por IA · avançado › Trocar chave)."
+        case .noKey: return "Configure a chave da API da Anthropic no app (Configurações › Leitura por IA)."
         case .tooLarge: return "Arquivo muito grande (máx. ~10 MB)."
         case .network(let m): return "Sem conexão com a API: \(m)"
         case .api(let status, let message):
             switch status {
             case 401: return "Chave da API inválida ou revogada. Troque a chave no app."
-            case 403: return "Esta chave não tem permissão para usar o modelo escolhido."
+            case 403: return "Esta chave não tem permissão para usar o modelo \(AIReader.defaultModel)."
             case 429: return "Limite de uso da API atingido. Aguarde um instante e tente de novo."
             case 529: return "API sobrecarregada no momento. Tente de novo em alguns segundos."
             default: return "Erro da API (HTTP \(status)): \(message)"
@@ -49,7 +41,10 @@ enum AIReadError: LocalizedError {
 enum AIReader {
     static let endpoint = URL(string: "https://api.anthropic.com/v1/messages")!
     static let modelsEndpoint = URL(string: "https://api.anthropic.com/v1/models")!
+    /// Modelo fixo (não há mais escolha na interface): bom equilíbrio entre precisão na leitura de
+    /// laudos e velocidade/custo. Mostrado em Configurações › Leitura por IA.
     static let defaultModel = "claude-sonnet-5"
+    static let defaultModelTitle = "Claude Sonnet 5"
     static let allowedImageTypes: Set<String> = ["image/jpeg", "image/png", "image/gif", "image/webp"]
     /// ~10 MB de base64 ≈ 7,5 MB de arquivo.
     static let maxBase64Length = 14_000_000
@@ -65,7 +60,7 @@ enum AIReader {
             source = ["type": "image", "source": ["type": "base64", "media_type": mt, "data": req.data]]
         }
 
-        var payload: [String: Any] = [
+        let payload: [String: Any] = [
             "model": req.model,
             // 3000: nos modelos da geração 5 o "adaptive thinking" consome tokens DENTRO
             // do max_tokens; 1024 poderia truncar o JSON. O texto de saída segue ~120 tokens.
@@ -83,11 +78,6 @@ enum AIReader {
         http.setValue("application/json", forHTTPHeaderField: "content-type")
         http.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         http.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-        if req.model.hasPrefix("claude-opus-5") {
-            // Se o classificador de segurança recusar, a própria API refaz o pedido num modelo alternativo.
-            payload["fallbacks"] = "default"
-            http.setValue("server-side-fallback-2026-07-01", forHTTPHeaderField: "anthropic-beta")
-        }
         http.httpBody = try JSONSerialization.data(withJSONObject: payload)
 
         let (data, resp): (Data, URLResponse)

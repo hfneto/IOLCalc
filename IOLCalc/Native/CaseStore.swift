@@ -21,7 +21,19 @@ struct CaseSnapshot: Codable, Equatable {
     var compareB: String
 }
 
-/// Um caso salvo: nome, datas, resumo por olho (para a lista) e o estado.
+/// Uma página do laudo guardada com o caso. Os bytes ficam em `laudos/<id do caso>/<fileName>`
+/// ao lado do `cases.json` (local e iCloud); no `cases.json` só entram nome e tipo. `base64` é
+/// preenchido apenas no arquivo de exportação (.iolcase.json), para o laudo viajar junto.
+struct LaudoPage: Codable, Equatable {
+    var fileName: String
+    /// Identificador do UTType (ex.: "public.jpeg", "com.adobe.pdf").
+    var type: String
+    var base64: String?
+
+    var utType: UTType? { UTType(type) }
+}
+
+/// Um caso salvo: nome, datas, resumo por olho (para a lista), o estado e o laudo (se lido).
 struct SavedCase: Codable, Identifiable, Equatable {
     var id: UUID
     var name: String
@@ -30,6 +42,9 @@ struct SavedCase: Codable, Identifiable, Equatable {
     var summaryOD: String?
     var summaryOE: String?
     var snapshot: CaseSnapshot
+    var laudo: [LaudoPage]?
+
+    var hasLaudo: Bool { !(laudo ?? []).isEmpty }
 
     /// Nome de lista: paciente ou "Caso sem nome".
     static func defaultName(for snapshot: CaseSnapshot) -> String {
@@ -257,6 +272,14 @@ final class CaseStore {
         cases = merged
         if changed || data == nil || !migrated { persist() }
         if data != nil || !cases.isEmpty { UserDefaults.standard.set(true, forKey: Self.migratedKey) }
+        if changed { pruneLocalLaudos() }
+    }
+
+    /// Apaga do espelho local as pastas de laudo de casos que não existem mais (apagados noutro aparelho).
+    private func pruneLocalLaudos() {
+        guard let dirs = try? FileManager.default.contentsOfDirectory(at: localLaudoDir, includingPropertiesForKeys: nil) else { return }
+        let ids = Set(cases.map { $0.id.uuidString })
+        for d in dirs where !ids.contains(d.lastPathComponent) { try? FileManager.default.removeItem(at: d) }
     }
 
     private func writeCloud(_ data: Data, to url: URL) throws {
@@ -270,29 +293,36 @@ final class CaseStore {
         lastCloudWrite = data
     }
 
-    /// Salva o estado do modelo como caso novo e devolve o caso.
+    /// Salva o estado do modelo como caso novo e devolve o caso. `laudo`: páginas lidas nesta
+    /// sessão (vazio = sem laudo).
     @discardableResult
-    func saveNew(from model: CalculatorModel) -> SavedCase {
+    func saveNew(from model: CalculatorModel, laudo: [PickedFile] = []) -> SavedCase {
         let snap = model.snapshot()
         let now = Date()
-        let c = SavedCase(id: UUID(), name: SavedCase.defaultName(for: snap), createdAt: now, updatedAt: now,
+        var c = SavedCase(id: UUID(), name: SavedCase.defaultName(for: snap), createdAt: now, updatedAt: now,
                           summaryOD: model.summary(.od), summaryOE: model.summary(.oe), snapshot: snap)
+        if !laudo.isEmpty { c.laudo = writeLaudo(laudo, for: c.id) }
         cases.insert(c, at: 0)
         persist()
         model.loadedCaseID = c.id
         return c
     }
 
-    /// Atualiza o caso de onde o modelo veio (ou salva um novo se ele não existe mais).
+    /// Atualiza o caso de onde o modelo veio (ou salva um novo se ele não existe mais). `laudo`
+    /// `nil` mantém o laudo guardado; uma lista (mesmo vazia) substitui.
     @discardableResult
-    func update(from model: CalculatorModel) -> SavedCase {
-        guard let id = model.loadedCaseID, let i = cases.firstIndex(where: { $0.id == id }) else { return saveNew(from: model) }
+    func update(from model: CalculatorModel, laudo: [PickedFile]? = nil) -> SavedCase {
+        guard let id = model.loadedCaseID, let i = cases.firstIndex(where: { $0.id == id }) else { return saveNew(from: model, laudo: laudo ?? []) }
         var c = cases[i]
         c.snapshot = model.snapshot()
         c.name = SavedCase.defaultName(for: c.snapshot)
         c.updatedAt = Date()
         c.summaryOD = model.summary(.od)
         c.summaryOE = model.summary(.oe)
+        if let laudo {
+            removeLaudoFiles(for: c.id)
+            c.laudo = laudo.isEmpty ? nil : writeLaudo(laudo, for: c.id)
+        }
         cases.remove(at: i)
         cases.insert(c, at: 0)
         persist()
@@ -305,7 +335,114 @@ final class CaseStore {
 
     func delete(_ c: SavedCase) {
         cases.removeAll { $0.id == c.id }
+        removeLaudoFiles(for: c.id)
         persist()
+    }
+
+    // MARK: Laudo (arquivos ao lado do cases.json)
+
+    private var localLaudoDir: URL { fileURL.deletingLastPathComponent().appendingPathComponent("laudos", isDirectory: true) }
+    private var cloudLaudoDir: URL? { cloudURL?.deletingLastPathComponent().appendingPathComponent("laudos", isDirectory: true) }
+
+    /// Grava as páginas (imagens reamostradas, PDF como está) em `laudos/<id>/` local e, se ativo,
+    /// no iCloud; devolve os metadados para o `cases.json`.
+    /// `raw`: grava os bytes como vieram (importação de um caso já comprimido).
+    private func writeLaudo(_ files: [PickedFile], for id: UUID, raw: Bool = false) -> [LaudoPage] {
+        var pages: [LaudoPage] = []
+        let copies = raw ? files : files.enumerated().map { UploadPrep.storageCopy($1, index: $0 + 1) }
+        let local = localLaudoDir.appendingPathComponent(id.uuidString, isDirectory: true)
+        try? FileManager.default.createDirectory(at: local, withIntermediateDirectories: true)
+        for f in copies {
+            do { try f.data.write(to: local.appendingPathComponent(f.name), options: .atomic) } catch { loadError = "Não foi possível guardar o laudo: \(error.localizedDescription)"; continue }
+            pages.append(LaudoPage(fileName: f.name, type: (f.type ?? .data).identifier))
+        }
+        if let cloud = cloudLaudoDir?.appendingPathComponent(id.uuidString, isDirectory: true) {
+            try? FileManager.default.createDirectory(at: cloud, withIntermediateDirectories: true)
+            for f in copies {
+                var err: NSError?
+                NSFileCoordinator().coordinate(writingItemAt: cloud.appendingPathComponent(f.name), options: .forReplacing, error: &err) { u in
+                    try? f.data.write(to: u, options: .atomic)
+                }
+            }
+        }
+        return pages
+    }
+
+    private func removeLaudoFiles(for id: UUID) {
+        try? FileManager.default.removeItem(at: localLaudoDir.appendingPathComponent(id.uuidString))
+        if let cloud = cloudLaudoDir?.appendingPathComponent(id.uuidString, isDirectory: true), FileManager.default.fileExists(atPath: cloud.path) {
+            var err: NSError?
+            NSFileCoordinator().coordinate(writingItemAt: cloud, options: .forDeleting, error: &err) { u in try? FileManager.default.removeItem(at: u) }
+        }
+    }
+
+    /// Lê as páginas do laudo de um caso: do espelho local ou, faltando, do iCloud (pede o download e
+    /// espera até ≈60 s por página; o que baixar vira espelho local). Páginas que não vierem ficam de fora.
+    func loadLaudo(_ c: SavedCase) async -> [PickedFile] {
+        guard let pages = c.laudo, !pages.isEmpty else { return [] }
+        let local = localLaudoDir.appendingPathComponent(c.id.uuidString, isDirectory: true)
+        let cloud = cloudLaudoDir?.appendingPathComponent(c.id.uuidString, isDirectory: true)
+        var out: [PickedFile] = []
+        for p in pages {
+            let localURL = local.appendingPathComponent(p.fileName)
+            if let d = try? Data(contentsOf: localURL) {
+                out.append(PickedFile(data: d, name: p.fileName, type: p.utType)); continue
+            }
+            guard let cloud else { continue }
+            let url = cloud.appendingPathComponent(p.fileName)
+            if let d = await Self.downloadCloudFile(url) {
+                try? FileManager.default.createDirectory(at: local, withIntermediateDirectories: true)
+                try? d.write(to: localURL, options: .atomic)
+                out.append(PickedFile(data: d, name: p.fileName, type: p.utType))
+            }
+        }
+        return out
+    }
+
+    /// Pede o download de um item do iCloud e espera ficar "current" (até ~60 s); depois lê com coordenação.
+    nonisolated private static func downloadCloudFile(_ url: URL) async -> Data? {
+        try? FileManager.default.startDownloadingUbiquitousItem(at: url)
+        for _ in 0..<120 {
+            let status = (try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]))?.ubiquitousItemDownloadingStatus
+            if status == .current || status == nil && FileManager.default.fileExists(atPath: url.path) {
+                var data: Data?
+                var err: NSError?
+                NSFileCoordinator().coordinate(readingItemAt: url, options: [], error: &err) { u in data = try? Data(contentsOf: u) }
+                if let data { return data }
+            }
+            try? await Task.sleep(for: .milliseconds(500))
+        }
+        return nil
+    }
+
+    /// Caso pronto para exportar: as páginas do laudo (do espelho local) vão embutidas em base64.
+    private func embeddingLaudo(_ c: SavedCase) -> SavedCase {
+        guard let pages = c.laudo, !pages.isEmpty else { return c }
+        var out = c
+        let local = localLaudoDir.appendingPathComponent(c.id.uuidString, isDirectory: true)
+        out.laudo = pages.map { p in
+            var q = p
+            q.base64 = (try? Data(contentsOf: local.appendingPathComponent(p.fileName)))?.base64EncodedString()
+            return q
+        }
+        return out
+    }
+
+    /// Caso importado: grava as páginas embutidas nos arquivos e tira o base64 dos metadados.
+    private func extractingLaudo(_ c: SavedCase) -> SavedCase {
+        guard let pages = c.laudo, !pages.isEmpty else { return c }
+        var out = c
+        let files = pages.compactMap { p -> PickedFile? in
+            guard let b = p.base64, let d = Data(base64Encoded: b) else { return nil }
+            return PickedFile(data: d, name: p.fileName, type: p.utType)
+        }
+        if files.isEmpty {
+            out.laudo = nil
+        } else {
+            removeLaudoFiles(for: c.id)
+            out.laudo = writeLaudo(files, for: c.id, raw: true)
+        }
+        return out
     }
 
     func rename(_ c: SavedCase, to name: String) {
@@ -317,11 +454,11 @@ final class CaseStore {
 
     func contains(_ id: UUID?) -> Bool { id.map { i in cases.contains { $0.id == i } } ?? false }
 
-    func export(_ c: SavedCase) -> CaseExport { CaseExport(cases: [c], fileName: c.fileName) }
+    func export(_ c: SavedCase) -> CaseExport { CaseExport(cases: [embeddingLaudo(c)], fileName: c.fileName) }
 
     func exportAll() -> CaseExport {
         let f = DateFormatter(); f.dateFormat = "yyyyMMdd"
-        return CaseExport(cases: cases, fileName: "Casos-LIO-\(f.string(from: Date())).iolcase.json")
+        return CaseExport(cases: cases.map(embeddingLaudo), fileName: "Casos-LIO-\(f.string(from: Date())).iolcase.json")
     }
 
     /// Importa os casos de um arquivo. Casos com o mesmo id de um existente são atualizados se
@@ -332,11 +469,11 @@ final class CaseStore {
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         let incoming = try CaseFile.parse(try Data(contentsOf: url))
         var n = 0
-        for c in incoming {
-            if let i = cases.firstIndex(where: { $0.id == c.id }) {
-                if c.updatedAt > cases[i].updatedAt { cases[i] = c; n += 1 }
+        for raw in incoming {
+            if let i = cases.firstIndex(where: { $0.id == raw.id }) {
+                if raw.updatedAt > cases[i].updatedAt { cases[i] = extractingLaudo(raw); n += 1 }
             } else {
-                cases.append(c); n += 1
+                cases.append(extractingLaudo(raw)); n += 1
             }
         }
         cases.sort { $0.updatedAt > $1.updatedAt }

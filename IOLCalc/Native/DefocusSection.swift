@@ -91,6 +91,7 @@ struct DefocusSection: View {
             HStack(spacing: 14) {
                 legendDot(Theme.od, "OD"); legendDot(Theme.oe, "OE"); legendDot(Theme.bino, "Binocular")
                 Spacer()
+                HelpButton(topic: .defocusSlider)
             }
             if series.isEmpty {
                 MutedText("selecione a LIO de ao menos um olho para ver as curvas")
@@ -198,6 +199,9 @@ private struct ResidualCard: View {
 struct CompareDrawer: View {
     @Bindable var model: CalculatorModel
     @State private var open = UserDefaults.standard.bool(forKey: "iol_sample")
+    /// Qual seletor pediu "Outra LIO…" (catálogo completo; sem constante manual no comparador).
+    @State private var other: Slot?
+    private enum Slot: String, Identifiable { case a, b; var id: String { rawValue } }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -216,6 +220,10 @@ struct CompareDrawer: View {
         .background(Theme.card)
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.line))
+        .sheet(item: $other) { slot in
+            LensChooserSheet(title: "Outra LIO · lente \(slot.rawValue.uppercased())", initialCustom: nil, allowCustom: false,
+                             onPick: { id in if slot == .a { model.compareA = id } else { model.compareB = id } })
+        }
     }
 
     private var picks: [(String, CalculatorModel.CompareResult)] {
@@ -230,8 +238,8 @@ struct CompareDrawer: View {
                     Picker("", selection: $model.compareEye) { ForEach(Eye.allCases) { Text($0.rawValue).tag($0) } }
                         .labelsHidden().pickerStyle(.segmented).fixedSize()
                 }
-                VStack(alignment: .leading, spacing: 3) { FieldLabel(text: "Lente A"); LensPicker(selection: $model.compareA, placeholder: "— selecione —").pickerStyle(.menu).frame(maxWidth: 320, alignment: .leading) }
-                VStack(alignment: .leading, spacing: 3) { FieldLabel(text: "Lente B"); LensPicker(selection: $model.compareB, placeholder: "— selecione —").pickerStyle(.menu).frame(maxWidth: 320, alignment: .leading) }
+                VStack(alignment: .leading, spacing: 3) { FieldLabel(text: "Lente A"); LensPicker(selection: $model.compareA, placeholder: "— selecione —", onOther: { other = .a }).pickerStyle(.menu).frame(maxWidth: 320, alignment: .leading) }
+                VStack(alignment: .leading, spacing: 3) { FieldLabel(text: "Lente B"); LensPicker(selection: $model.compareB, placeholder: "— selecione —", onOther: { other = .b }).pickerStyle(.menu).frame(maxWidth: 320, alignment: .leading) }
             }
             let picks = picks
             if picks.isEmpty {

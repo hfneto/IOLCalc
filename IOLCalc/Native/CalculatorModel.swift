@@ -16,6 +16,8 @@ struct EyeForm: Equatable, Codable {
     var tk1 = "", tk2 = "", tkAxis = ""
     var showTK = false
     var lensID = ""
+    /// LIO digitada à mão ("Outra"); vale quando `lensID == IOLLens.customID`.
+    var custom: CustomLens?
     var aConstant = ""
     var target = "0,00"
     var enabled = true
@@ -28,7 +30,10 @@ struct EyeForm: Equatable, Codable {
 
     static let sliderRange = -4.0...1.0
 
-    var lens: IOLLens? { LensCatalog.lens(id: lensID) }
+    var lens: IOLLens? {
+        if lensID == IOLLens.customID { return custom?.lens }
+        return LensCatalog.lens(id: lensID)
+    }
     var km: Double? { Keratometry.mean(k1: Num.parse(k1), k2: Num.parse(k2)) }
     var deltaK: Double? { Keratometry.delta(k1: Num.parse(k1), k2: Num.parse(k2)) }
     var hasTK: Bool { Num.parse(tk1) != nil && Num.parse(tk2) != nil }
@@ -48,6 +53,15 @@ struct EyeForm: Equatable, Codable {
         al = ""; k1 = ""; k2 = ""; kAxis = ""; acd = ""; lt = ""; wtw = ""; cct = ""
         tk1 = ""; tk2 = ""; tkAxis = ""
     }
+}
+
+/// LIO fora do catálogo: nome, classe (curva média e disfotopsia da classe) e constante A.
+struct CustomLens: Equatable, Codable {
+    var name: String
+    var category: LensCategory
+    var aConstant: Double
+
+    var lens: IOLLens { LensCatalog.custom(name: name, category: category, aConstant: aConstant) }
 }
 
 /// Estado do cálculo de um olho na seção 3.
@@ -134,6 +148,13 @@ final class CalculatorModel {
         self[eye].aConstant = LensCatalog.lens(id: id).map { Num.fmt($0.aConstant) } ?? ""
     }
 
+    /// "Outra": LIO digitada à mão para este olho.
+    func selectCustomLens(_ custom: CustomLens, for eye: Eye) {
+        self[eye].custom = custom
+        self[eye].lensID = IOLLens.customID
+        self[eye].aConstant = Num.fmt(custom.aConstant)
+    }
+
     /// Alvo da seção 2; move a régua da seção 5 junto (limitada à faixa da régua).
     func setTarget(_ text: String, for eye: Eye) {
         self[eye].target = text
@@ -144,6 +165,7 @@ final class CalculatorModel {
     /// Copia LIO, constante A (mesmo personalizada) e alvo do OD para o OE.
     func copyODtoOE() {
         oe.lensID = od.lensID
+        oe.custom = od.custom
         oe.aConstant = od.aConstant
         setTarget(od.target, for: .oe)
     }

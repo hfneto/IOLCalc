@@ -179,10 +179,15 @@ struct NumberField: View {
     @Binding var text: String
     var placeholder = ""
     var highlighted = false
+    /// Botão "?" ao lado do rótulo.
+    var help: HelpTopic? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            FieldLabel(text: label)
+            HStack(spacing: 4) {
+                FieldLabel(text: label)
+                if let help { HelpButton(topic: help) }
+            }
             TextField(placeholder, text: $text)
                 .textFieldStyle(.plain)
                 .font(.system(size: 14))
@@ -233,26 +238,60 @@ struct PillButton: View {
     }
 }
 
-/// Seletor de LIO agrupado por categoria, como o `<select>` da web.
+/// Seletor de LIO agrupado por categoria, como o `<select>` da web. Mostra só as favoritas
+/// (Configurações › Lentes), mais a lente em uso se não for favorita, e "Outra LIO…" no fim.
 struct LensPicker: View {
     @Binding var selection: String
     var placeholder = "— selecione a LIO —"
+    /// LIO digitada à mão em vigor (mostrada quando `selection` é `IOLLens.customID`).
+    var custom: CustomLens? = nil
+    /// Ação de "Outra LIO…" (catálogo completo ou constante manual); `nil` esconde a opção.
+    var onOther: (() -> Void)? = nil
 
-    static let groups: [(LensCategory, String)] = [
-        (.monofocal, "Monofocais"), (.enhancedMonofocal, "Enhanced"), (.edof, "EDOF"),
-        (.bifocal, "Bifocais"), (.trifocal, "Trifocais/Pentafocal"), (.continuous, "Contínua/CRV"),
-    ]
+    private static let otherTag = "__other"
+    @State private var prefs = LensPreferences.shared
+    /// Recria o Picker depois de "Outra…" para o menu não ficar mostrando essa opção.
+    @State private var generation = 0
 
     var body: some View {
-        Picker("", selection: $selection) {
+        let entries = entries
+        Picker("", selection: proxy) {
             Text(placeholder).tag("")
-            ForEach(Self.groups, id: \.0) { cat, name in
-                Section(name) {
-                    ForEach(LensCatalog.all.filter { $0.category == cat }) { Text($0.name).tag($0.id) }
+            ForEach(LensCategory.allCases) { cat in
+                let lenses = entries.filter { $0.category == cat }
+                if !lenses.isEmpty {
+                    Section(cat.title) {
+                        ForEach(lenses) { Text($0.name).tag($0.id) }
+                    }
                 }
+            }
+            if selection == IOLLens.customID, let custom {
+                Section("Outra") { Text(custom.name.isEmpty ? "Outra LIO" : custom.name).tag(IOLLens.customID) }
+            }
+            if onOther != nil {
+                Section { Text("Outra LIO…").tag(Self.otherTag) }
             }
         }
         .labelsHidden()
+        .id(generation)
+    }
+
+    private var proxy: Binding<String> {
+        Binding(get: { selection }, set: { new in
+            if new == Self.otherTag {
+                generation += 1
+                onOther?()
+            } else {
+                selection = new
+            }
+        })
+    }
+
+    /// Favoritas na ordem do catálogo, mais a lente selecionada quando não é favorita.
+    private var entries: [IOLLens] {
+        var ids = Set(prefs.favorites)
+        if !selection.isEmpty, selection != IOLLens.customID { ids.insert(selection) }
+        return LensCatalog.all.filter { ids.contains($0.id) }
     }
 }
 

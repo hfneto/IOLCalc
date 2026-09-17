@@ -1,4 +1,4 @@
-# Estado do projeto — 13/09/2026
+# Estado do projeto — 17/09/2026
 
 Sessões: https://claude.ai/code/session_0153A2Tu3tz7zphMYzUt9NQP (Fase 0),
 https://claude.ai/code/session_01WvfqNJWEFnjbtQFmfWf4dC (Fases 3 a 5) e
@@ -145,6 +145,67 @@ vez e depois entrada automática por Face ID.
 - Ficou de fora: força do desfoque/arrasto (subjetivo, o usuário não pediu mudança) e regenerar as
   fotos com telas mais frontais.
 
+## Rodada de 17/09 (cinco pedidos do usuário)
+1. **Conferir o laudo no próprio app.** `LaudoInspector.swift`: os arquivos lidos (fotos/PDF) viram
+   um `PDFDocument` (imagens → `PDFPage(image:)`) mostrado num `PDFView` (zoom, páginas) dentro de
+   `.inspector` — coluna à direita no Mac/iPad, folha no iPhone. Abre sozinho depois da leitura
+   quando há largura; botões "Ver laudo" (na mensagem de estado) e "Laudo" (barra do paciente);
+   "Abrir arquivo…" no painel para conferir um laudo sem IA. O `CompactWidthProvider` passou para
+   DENTRO do inspector (`NativeCalculatorView`): com o laudo aberto a coluna encolhe e a página vai
+   para uma coluna (antes estourava e era cortada). O laudo fica só na sessão (não é salvo no caso).
+   Depuração: `-iol_laudo_file <caminho dentro do container>` abre o arquivo como se lido.
+2. **Catálogo de lentes e favoritas.** `LensCatalog` passou de 20 para 59 lentes (Alcon, J&J, Zeiss,
+   HOYA, Rayner, BVI/PhysIOL, Bausch + Lomb, Hanita, Mediphacos, Medicontur, Teleon, Ophtec, Aurolab,
+   Biotech), com `notes` (origem da constante: fabricante/IOLcon, ULIB SRK/T otimizada, rótulo;
+   registro Anvisa quando encontrado) e `curveEstimated` (curva de lente parecida/média da classe).
+   Os 20 ids originais não mudaram (casos salvos). Fontes: ULIB (ocusoft.de/ulib), iolreference.com,
+   site da Mediphacos (MFR2, UnA, BIOS com registro Anvisa). O portal da Anvisa bloqueia consulta
+   automatizada: a lista é a das marcas comercializadas no Brasil, não "todas com registro".
+   `LensPreferences` (UserDefaults `iol_fav_lenses`, padrão = as 20 originais) → `LensPicker`
+   mostra só favoritas + a lente em uso + "Outra LIO…" → `LensChooserSheet` (catálogo completo com
+   estrela, ou nome/classe/constante à mão → `CustomLens` em `EyeForm.custom`, `lensID = "custom"`,
+   curva média da classe por `LensCatalog.referenceCurve`). Comparador também tem "Outra…" (só
+   catálogo). Configurações › Lentes lista tudo por fabricante.
+3. **Explicações.** `HelpTopics.swift`: 12 tópicos (`HelpTopic`) com botão "?" (`HelpButton`,
+   popover também no iPhone) ao lado de: método/ΔA, constante A, LIO, TK, seção 3, seção 4,
+   seção 5, seção 6, base do astigmatismo, plataforma/razão, leitura por IA; e reunidos em
+   Configurações › Ajuda (`SettingsSheet.swift`, engrenagem na barra do paciente).
+4. **Modelo fixo.** `AIReader.defaultModel = claude-sonnet-5` (título em `defaultModelTitle`);
+   seletor e chave `iol_model` removidos; o fallback do Opus saiu. Configurações › Leitura por IA
+   mostra o modelo, chave (trocar/remover) e a caixa do Face ID.
+5. **Preenchimento das calculadoras.** Causa do "não colou o eixo" na Kane: (a) o JSON não tinha
+   eixos; (b) o preenchimento rodava 0,8/2,5/5 s após o load, antes de o usuário aceitar "I Agree"
+   (a Kane só monta o formulário depois); (c) `\b` não separa `_`, então `k1_right_t_axis` caía em
+   K1. Agora: JSON v2 com `K1_axis`/`K2_axis` (K1 = K2 + 90°), `TK1/2_axis` e `NAME`; rótulos
+   normalizados (`_`/`-` → espaço); regras de eixo/TK/CCT antes das de K; "Axis" solto herda o K
+   anterior (Lucena); label sem `for` no contêiner (Vue/React); célula rotulada mais próxima na
+   tabela (Barrett); `_1`/`_2` → OD/OE (Kane); campos escondidos só com olho explícito; campos já
+   preenchidos marcados (`data-iol-filled`). O script é injetado como `WKUserScript` em todos os
+   frames (Hill-RBF fica num iframe de outra origem) e repete a cada 1,5 s por ≈5 min, avisando o app
+   por `webkit.messageHandlers.iolFill`. "Copiar biometria" inclui eixos, TK e a LIO.
+   Conferido com `Tools/filltest.swift` (WKWebView sem janela) nos 5 sites: Kane 33 campos (com a
+   aba tórica), Barrett 18, ESCRS 29, Lucena 25 (com eixos), RBF 5 + 6 no iframe (AL/K ficam
+   desabilitados até o usuário escolher no site; o polling preenche quando liberarem).
+
+### Complementos (17/09, tarde)
+- **Favoritas pelo iCloud.** `LensPreferences` grava no UserDefaults e no
+  `NSUbiquitousKeyValueStore` (chave `iol_fav_lenses`); ao iniciar, o valor do iCloud vence; mudanças
+  externas chegam por `didChangeExternallyNotification`. Entitlement novo em `IOLCalc.entitlements`:
+  `com.apple.developer.ubiquity-kvstore-identifier = $(TeamIdentifierPrefix)$(CFBundleIdentifier)`.
+  **No Xcode**, se a assinatura reclamar: Signing & Capabilities › iCloud › marcar "Key-value storage"
+  (o perfil precisa incluir o KVS). Sem o entitlement o app não quebra: as favoritas ficam locais.
+- **Laudo guardado com o caso.** `SavedCase.laudo: [LaudoPage]?` (nome do arquivo + UTType) no
+  `cases.json`; os bytes ficam em `laudos/<id do caso>/paginaN.(jpg|pdf)` ao lado do `cases.json`,
+  no espelho local e no iCloud Drive (`Documents/laudos/…`, `NSFileCoordinator`). Imagens são
+  reamostradas ao guardar (`UploadPrep.storageCopy`: máx. 2000 px, JPEG 0,75); PDFs seguem inteiros.
+  "Salvar caso" leva o laudo da sessão; "Atualizar" só troca o laudo quando a sessão leu um novo
+  (`AIReaderState.laudoCaseID` marca de qual caso o laudo atual veio; nunca apaga por omissão).
+  Abrir um caso carrega o laudo (`CaseStore.loadLaudo`: local, senão pede o download do iCloud e
+  espera até ≈60 s por página; a barra mostra "Laudo · baixando…"). Apagar o caso apaga a pasta;
+  `pruneLocalLaudos` limpa pastas de casos apagados noutro aparelho. Exportar embute as páginas em
+  base64 no `.iolcase.json` (`LaudoPage.base64`) e importar grava os arquivos de volta (bytes
+  intactos). Lista de casos mostra o chip "laudo". `-iol_cases_test` cobre tudo isso (OK).
+
 ## Pendências do usuário
 1. Abrir o app no Mac, colar a chave da API (console.anthropic.com) e ler um laudo real; no iPhone a
    chave chega pelo iCloud Keychain (nada a digitar) e o app pede Face ID ao abrir.
@@ -187,5 +248,9 @@ vez e depois entrada automática por Face ID.
   ação) e registra o antes/depois — serve para provar que o seletor funciona sem tocar na interface;
   `-iol_ai_fake_file <txt>` aplica um JSON como se viesse da IA; `-iol_prep_test <imagem>` grava
   `<imagem>.txt` com o resultado do preparo de upload.
+- Preenchimento das calculadoras oficiais: `swiftc -O Tools/filltest.swift -o /tmp/filltest` e
+  `/tmp/filltest <url> [segundos]`; `PRE_JS="…"` executa um JS antes (aceitar termos), `USERSCRIPT=1`
+  usa o mesmo script de todos os frames do app, `DEBUG_FILL=1` lista rótulo → olho → grandeza,
+  `DUMP=1` imprime o texto/botões da página (`DUMP_JS=<arquivo>` um JS próprio).
 - Valores dourados: `jsc docs/toric-generator.js > IOLCore/Tests/IOLCoreTests/Resources/toric.json`
   (jsc em `/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc`).

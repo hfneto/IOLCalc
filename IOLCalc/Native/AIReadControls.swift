@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 
 /// Botão "Ler laudo com IA" e tudo que ele precisa: escolha do arquivo (Mac: arquivos;
 /// iPhone: câmera, fotos ou arquivos), mensagem de estado e a gaveta "avançado"
-/// (modelo e chave da API). Vive dentro da seção 1.
+/// (estado da chave da API; o modelo é fixo). Vive dentro da seção 1.
 struct AIReadControls: View {
     let model: CalculatorModel
     @Bindable var reader: AIReaderState
@@ -83,7 +83,7 @@ struct AIReadControls: View {
         return PickedFile(data: data, name: url.lastPathComponent, type: UTType(filenameExtension: url.pathExtension))
     }
 
-    /// Gaveta "Leitura por IA · avançado": modelo e chave.
+    /// Gaveta "Leitura por IA · avançado": estado da chave e modelo (fixo). O resto fica em Configurações.
     struct Advanced: View {
         @Bindable var reader: AIReaderState
         @State private var open = false
@@ -91,22 +91,17 @@ struct AIReadControls: View {
 
         var body: some View {
             DisclosureGroup(isExpanded: $open) {
-                HStack(alignment: .bottom, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        FieldLabel(text: "Modelo")
-                        Picker("", selection: $reader.model) {
-                            ForEach(AIReaderState.models, id: \.id) { Text($0.title).tag($0.id) }
-                        }
-                        .labelsHidden().compactFixedSize()
-                    }
+                FlowLayout(spacing: 12) {
                     MutedText(reader.hasKey ? "chave da API configurada · leitura por IA ativa" : "sem chave da API · leitura por IA desativada")
-                        .padding(.bottom, 8)
                     PillButton(title: reader.hasKey ? "Trocar chave da API" : "Configurar chave") { showKey = true }
-                    Spacer()
+                    MutedText("modelo \(AIReader.defaultModelTitle) · abrir laudo ao lado para conferir · mais em Configurações")
                 }
                 .padding(.top, 6)
             } label: {
-                MutedText("Leitura por IA · avançado")
+                HStack(spacing: 6) {
+                    MutedText("Leitura por IA · avançado")
+                    HelpButton(topic: .aiReading)
+                }
             }
             .tint(Theme.muted)
             .sheet(isPresented: $showKey) {

@@ -146,9 +146,61 @@ enum DebugSnapshot {
             try? FileManager.default.removeItem(at: url4)
         } catch { ok = false; log.append("export/import error: \(error)") }
         try? FileManager.default.removeItem(at: exportURL)
-        log.append(ok ? "OK" : "FAIL")
-        try? FileManager.default.removeItem(at: url)
-        try? log.joined(separator: "\n").write(toFile: out, atomically: true, encoding: .utf8)
+        // laudo guardado com o caso: salvar com 2 páginas (PDF + imagem), recarregar, ler, trocar por 1,
+        // exportar/importar com as páginas embutidas, apagar (a pasta some)
+        let url5 = FileManager.default.temporaryDirectory.appendingPathComponent("iol-cases-laudo-\(UUID().uuidString)/cases.json")
+        let store5 = CaseStore(fileURL: url5)
+        let pdf = Data("%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF".utf8)
+        let png: Data = {
+            let r = ImageRenderer(content: Color.red.frame(width: 40, height: 30))
+            r.scale = 1
+            let img = r.nsImage!
+            return NSBitmapImageRep(data: img.tiffRepresentation!)!.representation(using: .png, properties: [:])!
+        }()
+        let pages = [PickedFile(data: pdf, name: "laudo.pdf", type: .pdf), PickedFile(data: png, name: "foto.png", type: .png)]
+        let c5 = store5.saveNew(from: model, laudo: pages)
+        let dir5 = url5.deletingLastPathComponent().appendingPathComponent("laudos/\(c5.id.uuidString)")
+        let files5 = (try? FileManager.default.contentsOfDirectory(atPath: dir5.path))?.sorted() ?? []
+        ok = ok && c5.laudo?.map(\.fileName) == ["pagina1.pdf", "pagina2.jpg"] && files5 == ["pagina1.pdf", "pagina2.jpg"]
+        log.append("laudo saved pages=\(c5.laudo?.map(\.fileName) ?? []) files=\(files5)")
+        Task { @MainActor in
+            var ok2 = ok
+            let reloaded = CaseStore(fileURL: url5)
+            let read = await reloaded.loadLaudo(reloaded.cases.first!)
+            ok2 = ok2 && read.count == 2 && read[0].data == pdf && read[1].type == .jpeg && !read[1].data.isEmpty
+            log.append("laudo reloaded count=\(read.count) pdfEqual=\(read.first?.data == pdf) jpg=\(read.last?.data.count ?? 0) bytes")
+            // atualizar sem laudo mantém; com laudo novo substitui
+            model.loadedCaseID = c5.id
+            let kept = reloaded.update(from: model, laudo: nil)
+            let replaced = reloaded.update(from: model, laudo: [pages[1]])
+            let files6 = (try? FileManager.default.contentsOfDirectory(atPath: dir5.path))?.sorted() ?? []
+            ok2 = ok2 && kept.laudo?.count == 2 && replaced.laudo?.count == 1 && files6 == ["pagina1.jpg"]
+            log.append("laudo update kept=\(kept.laudo?.count ?? 0) replaced=\(replaced.laudo?.count ?? 0) files=\(files6)")
+            // exportar → importar noutra loja: as páginas viajam embutidas
+            let exp = reloaded.export(replaced)
+            ok2 = ok2 && exp.cases.first?.laudo?.first?.base64 != nil
+            let expURL = FileManager.default.temporaryDirectory.appendingPathComponent(exp.fileName)
+            let url7 = FileManager.default.temporaryDirectory.appendingPathComponent("iol-cases-laudo-imp-\(UUID().uuidString)/cases.json")
+            do {
+                try CaseFile.encoder.encode(CaseFile(cases: exp.cases)).write(to: expURL, options: .atomic)
+                let store7 = CaseStore(fileURL: url7)
+                let n = try store7.importCases(from: expURL)
+                let read7 = await store7.loadLaudo(store7.cases.first!)
+                ok2 = ok2 && n == 1 && store7.cases.first?.laudo?.first?.base64 == nil && read7.count == 1 && read7[0].data == read[1].data
+                log.append("laudo export/import n=\(n) pages=\(read7.count) sameBytes=\(read7.first?.data == read[1].data)")
+                store7.delete(store7.cases.first!)
+                ok2 = ok2 && !FileManager.default.fileExists(atPath: url7.deletingLastPathComponent().appendingPathComponent("laudos/\(replaced.id.uuidString)").path)
+                try? FileManager.default.removeItem(at: url7.deletingLastPathComponent())
+            } catch { ok2 = false; log.append("laudo export/import error: \(error)") }
+            try? FileManager.default.removeItem(at: expURL)
+            reloaded.delete(replaced)
+            ok2 = ok2 && !FileManager.default.fileExists(atPath: dir5.path)
+            log.append("laudo deleted dirGone=\(!FileManager.default.fileExists(atPath: dir5.path))")
+            try? FileManager.default.removeItem(at: url5.deletingLastPathComponent())
+            log.append(ok2 ? "OK" : "FAIL")
+            try? FileManager.default.removeItem(at: url)
+            try? log.joined(separator: "\n").write(toFile: out, atomically: true, encoding: .utf8)
+        }
     }
 
     @MainActor static func runIfRequested() {

@@ -11,15 +11,6 @@ struct PickedFile: Sendable {
     let type: UTType?
 }
 
-extension AIReadRequest {
-    init(model: String, isPDF: Bool, mediaType: String, data: String) {
-        self.model = model
-        self.isPDF = isPDF
-        self.mediaType = mediaType
-        self.data = data
-    }
-}
-
 /// Prepara o arquivo para a API, como o `prepareUpload` da web: PDF segue como está; imagens são
 /// redimensionadas (máx. 2600 px no maior lado, respeitando a orientação EXIF) e recomprimidas em
 /// JPEG até o base64 caber em ~5 MB.
@@ -27,7 +18,7 @@ enum UploadPrep {
     static let maxDimension = 2600
     static let maxBase64 = 5_000_000
 
-    static func prepare(_ file: PickedFile, model: String) -> AIReadRequest {
+    static func prepare(_ file: PickedFile, model: String = AIReader.defaultModel) -> AIReadRequest {
         let isPDF = file.type?.conforms(to: .pdf) == true
             || file.name.lowercased().hasSuffix(".pdf")
             || file.data.starts(with: [0x25, 0x50, 0x44, 0x46]) // %PDF
@@ -41,7 +32,7 @@ enum UploadPrep {
         }
         var maxPixels = maxDimension
         var quality = 0.9
-        var out = encodeJPEG(source, maxPixels: maxPixels, quality: quality) ?? file.data.base64EncodedString()
+        var out = encodeJPEG(source, maxPixels: maxPixels, quality: quality)?.base64EncodedString() ?? file.data.base64EncodedString()
         // baixa a qualidade e, se preciso, a resolução até caber
         var guardCount = 0
         while out.count > maxBase64, guardCount < 12 {
@@ -53,13 +44,28 @@ enum UploadPrep {
                 quality = 0.82
                 if maxPixels < 500 { break }
             }
-            if let next = encodeJPEG(source, maxPixels: maxPixels, quality: quality) { out = next }
+            if let next = encodeJPEG(source, maxPixels: maxPixels, quality: quality) { out = next.base64EncodedString() }
         }
         return AIReadRequest(model: model, isPDF: false, mediaType: "image/jpeg", data: out)
     }
 
-    /// Miniatura já com a orientação aplicada, sobre fundo branco, codificada em JPEG (base64).
-    private static func encodeJPEG(_ source: CGImageSource, maxPixels: Int, quality: Double) -> String? {
+    static func isPDF(_ file: PickedFile) -> Bool {
+        file.type?.conforms(to: .pdf) == true || file.name.lowercased().hasSuffix(".pdf") || file.data.starts(with: [0x25, 0x50, 0x44, 0x46])
+    }
+
+    /// Cópia para guardar com o caso: PDF como está; imagem reamostrada (máx. 2000 px, JPEG 0,75),
+    /// que continua legível com zoom e ocupa poucas centenas de KB no iCloud.
+    static func storageCopy(_ file: PickedFile, index: Int) -> PickedFile {
+        if isPDF(file) { return PickedFile(data: file.data, name: "pagina\(index).pdf", type: .pdf) }
+        guard let source = CGImageSourceCreateWithData(file.data as CFData, nil),
+              let jpeg = encodeJPEG(source, maxPixels: 2000, quality: 0.75) else {
+            return PickedFile(data: file.data, name: "pagina\(index).\(file.type?.preferredFilenameExtension ?? "jpg")", type: file.type ?? .jpeg)
+        }
+        return PickedFile(data: jpeg, name: "pagina\(index).jpg", type: .jpeg)
+    }
+
+    /// Miniatura já com a orientação aplicada, sobre fundo branco, codificada em JPEG.
+    private static func encodeJPEG(_ source: CGImageSource, maxPixels: Int, quality: Double) -> Data? {
         let opts: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
@@ -79,7 +85,7 @@ enum UploadPrep {
         guard let dest = CGImageDestinationCreateWithData(data, UTType.jpeg.identifier as CFString, 1, nil) else { return nil }
         CGImageDestinationAddImage(dest, flat, [kCGImageDestinationLossyCompressionQuality: quality] as CFDictionary)
         guard CGImageDestinationFinalize(dest) else { return nil }
-        return (data as Data).base64EncodedString()
+        return data as Data
     }
 }
 
@@ -173,7 +179,8 @@ struct BiometryReport: Equatable {
     }
 }
 
-/// Estado da leitura por IA na tela nativa: modelo escolhido, chave presente, progresso e mensagem.
+/// Estado da leitura por IA na tela nativa: chave presente, progresso, mensagem e o laudo aberto
+/// (para conferir os valores ao lado da calculadora). O modelo é fixo (`AIReader.defaultModel`).
 @MainActor
 @Observable
 final class AIReaderState {
@@ -184,23 +191,52 @@ final class AIReaderState {
         var details: [String] = []
     }
 
-    static let models: [(id: String, title: String)] = [
-        ("claude-sonnet-5", "claude-sonnet-5 (recomendado)"),
-        ("claude-opus-5", "claude-opus-5 (mais preciso)"),
-        ("claude-haiku-4-5-20251001", "claude-haiku-4-5 (mais rápido)"),
-    ]
-    private static let modelKey = "iol_model"
-
-    var model: String { didSet { UserDefaults.standard.set(model, forKey: Self.modelKey) } }
     var hasKey = APIKeyStore.load() != nil
     var busy = false
     var status: Status?
+    /// Arquivos do último laudo lido (ou aberto só para conferir); alimentam o `LaudoInspector`.
+    var laudo: [PickedFile] = []
+    /// Painel do laudo aberto (inspector no Mac/iPad, folha no iPhone).
+    var showLaudo = false
+    /// Sobe para `true` a cada leitura concluída: a tela abre o laudo ao lado quando há largura.
+    var laudoJustRead = false
+    /// Caso de onde o laudo atual veio (carregado da loja); `nil` quando foi lido/aberto nesta sessão.
+    var laudoCaseID: UUID?
+    /// Mensagem curta enquanto o laudo do caso baixa do iCloud.
+    var laudoLoading = false
 
-    init() {
-        model = UserDefaults.standard.string(forKey: Self.modelKey) ?? AIReader.defaultModel
-    }
+    init() {}
 
     func refreshKey() { hasKey = APIKeyStore.load() != nil }
+
+    /// Abre arquivos só para conferir, sem IA.
+    func open(_ files: [PickedFile]) {
+        guard !files.isEmpty else { return }
+        laudo = files
+        laudoCaseID = nil
+        showLaudo = true
+    }
+
+    func clear() {
+        status = nil
+        laudo = []
+        laudoCaseID = nil
+        showLaudo = false
+    }
+
+    /// Ao abrir um caso salvo: mostra o laudo guardado com ele (baixando do iCloud se preciso).
+    func loadLaudo(of saved: SavedCase, from store: CaseStore) {
+        status = nil
+        showLaudo = false
+        guard let pages = saved.laudo, !pages.isEmpty else { laudo = []; laudoCaseID = nil; return }
+        laudoLoading = true
+        Task {
+            let files = await store.loadLaudo(saved)
+            laudoLoading = false
+            laudo = files
+            laudoCaseID = files.isEmpty ? nil : saved.id
+        }
+    }
 
     /// Lê um ou mais arquivos com a IA e preenche a biometria do modelo.
     func read(_ files: [PickedFile], into calc: CalculatorModel) async {
@@ -217,20 +253,22 @@ final class AIReaderState {
         }
         busy = true
         defer { busy = false }
+        laudo = files
+        laudoCaseID = nil
         do {
             var merged = BiometryReport()
             for (i, file) in files.enumerated() {
                 status = Status(kind: .info, text: "Lendo laudo \(i + 1)/\(files.count) com IA… (alguns segundos)")
-                let model = self.model
-                let req = await Task.detached(priority: .userInitiated) { UploadPrep.prepare(file, model: model) }.value
+                let req = await Task.detached(priority: .userInitiated) { UploadPrep.prepare(file) }.value
                 let text = try await AIReader.read(req, apiKey: key)
                 merged.merge(try BiometryReport.parse(text))
             }
             calc.apply(merged)
             let warn = merged.warnings()
             status = Status(kind: warn.isEmpty ? .ok : .error,
-                            text: "Laudo lido. Confira os valores antes de calcular.",
+                            text: "Laudo lido. Confira os valores antes de calcular — abra o laudo ao lado com \"Ver laudo\".",
                             details: warn.isEmpty ? [] : ["⚠ Valores suspeitos, confira: " + warn.joined(separator: "; ")])
+            laudoJustRead = true
         } catch {
             status = Status(kind: .error, text: "Erro: \(error.localizedDescription)",
                             details: ["Você pode digitar os valores manualmente enquanto isso."])

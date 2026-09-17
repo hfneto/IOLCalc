@@ -124,11 +124,23 @@ struct SelfTestSnapshots {
         #expect(f(500) == f(nil))
     }
 
-    @Test("Catálogo: 20 lentes, ids únicos, 9 pontos de defocus")
+    @Test("Catálogo: ids únicos, 9 pontos de defocus, favoritas de fábrica e curva de referência")
     func catalog() {
-        #expect(LensCatalog.all.count == 20)
-        #expect(LensCatalog.byID.count == 20)
+        #expect(LensCatalog.all.count >= 55)
+        #expect(LensCatalog.byID.count == LensCatalog.all.count)
         #expect(LensCatalog.all.allSatisfy { $0.defocusValues.count == DefocusModel.defocusAxis.count })
+        #expect(LensCatalog.all.allSatisfy { (117.0...121.0).contains($0.aConstant) && (0...3).contains($0.dysphotopsia) })
         #expect(LensCatalog.lens(id: "panoptix")?.aConstant == 119.1)
+        // As 20 lentes originais continuam com os mesmos ids (casos salvos as referenciam).
+        #expect(LensCatalog.defaultFavorites.count == 20)
+        #expect(LensCatalog.defaultFavorites.allSatisfy { LensCatalog.lens(id: $0) != nil })
+        #expect(!LensCatalog.all.contains { $0.id == IOLLens.customID })
+        for c in LensCategory.allCases {
+            let curve = LensCatalog.referenceCurve(for: c)
+            #expect(curve.count == DefocusModel.defocusAxis.count)
+            #expect(curve.allSatisfy { $0 > -0.2 && $0 < 1.0 })
+        }
+        let custom = LensCatalog.custom(name: "Teste", category: .trifocal, aConstant: 118.7)
+        #expect(custom.isCustom && custom.aConstant == 118.7 && custom.dysphotopsia == 3)
     }
 }

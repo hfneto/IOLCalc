@@ -18,7 +18,10 @@ struct CalculatorsSection: View {
                 Task { try? await Task.sleep(for: .seconds(2)); copied = false }
             }
         )) {
-            MutedText("Cada botão abre a calculadora dentro do app e preenche AL, K1, K2, ACD, LT, WTW, constante A e alvo dos dois olhos nos campos que reconhecer (confira sempre). Se um site não aceitar o preenchimento automático, use \"Copiar biometria\" e cole à mão.", size: 12.5)
+            HStack(alignment: .top, spacing: 6) {
+                MutedText("Cada botão abre a calculadora dentro do app e preenche AL, K1, K2, eixos, ACD, LT, WTW, CCT, TK, constante A, alvo e nome dos dois olhos nos campos que reconhecer (confira sempre). Nos sites com abas (ex.: tórica da Kane), troque de aba e use \"Preencher de novo\". Se um site não aceitar o preenchimento automático, use \"Copiar biometria\" e cole à mão.", size: 12.5)
+                HelpButton(topic: .officialCalculators)
+            }
             FlowButtons {
                 ForEach(OfficialCalculator.all) { calc in
                     PillButton(title: calc.name + " ⇢ preencher") { external = ExternalCalculator(calc, dataJSON: model.biometryJSON()) }
@@ -84,25 +87,45 @@ enum Clipboard {
 }
 
 extension CalculatorModel {
-    /// Mesmo formato do `bioJSON()` da versão web (números com ponto, `null` quando vazio).
+    /// Eixo do K1 (plano): 90° do eixo do K2 (curvo), em 0–180.
+    static func flatAxis(fromSteep steep: Double?) -> Double? {
+        guard let steep else { return nil }
+        let a = (steep + 90).truncatingRemainder(dividingBy: 180)
+        return a == 0 ? 180 : a
+    }
+
+    /// Mesmo formato do `bioJSON()` da versão web (números com ponto, `null` quando vazio), mais os
+    /// eixos de K1/K2 e TK1/TK2 (a Kane, a ESCRS e a RBF têm campos de eixo) e o nome do paciente.
     func biometryJSON() -> String {
         func eye(_ e: Eye) -> [String: Any] {
             let f = self[e]
             func n(_ s: String) -> Any { Num.parse(s).map { $0 as Any } ?? NSNull() }
+            func n(_ v: Double?) -> Any { v.map { $0 as Any } ?? NSNull() }
             return ["AL": n(f.al), "K1": n(f.k1), "K2": n(f.k2), "ACD": n(f.acd), "LT": n(f.lt), "WTW": n(f.wtw), "CCT": n(f.cct),
-                    "TK1": n(f.tk1), "TK2": n(f.tk2), "A": n(f.aConstant), "TGT": n(f.target)]
+                    "TK1": n(f.tk1), "TK2": n(f.tk2), "A": n(f.aConstant), "TGT": n(f.target),
+                    "K1_axis": n(Self.flatAxis(fromSteep: Num.parse(f.kAxis))), "K2_axis": n(f.kAxis),
+                    "TK1_axis": n(Self.flatAxis(fromSteep: Num.parse(f.tkAxis))), "TK2_axis": n(f.tkAxis)]
         }
-        let obj: [String: Any] = ["v": 1, "OD": eye(.od), "OE": eye(.oe)]
+        let name = patientName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let obj: [String: Any] = ["v": 2, "NAME": name.isEmpty ? NSNull() : name, "OD": eye(.od), "OE": eye(.oe)]
         let data = (try? JSONSerialization.data(withJSONObject: obj)) ?? Data("{}".utf8)
         return String(decoding: data, as: UTF8.self)
     }
 
-    /// Texto para colar: "OD: AL 23,62 | K1 … " por olho.
+    /// Texto para colar: "OD: AL 23,62 | K1 … @ eixo | …" por olho, com TK quando medido.
     func biometrySummaryText() -> String {
         func line(_ e: Eye) -> String {
             let f = self[e]
-            let parts = [("AL", f.al), ("K1", f.k1), ("K2", f.k2), ("ACD", f.acd), ("LT", f.lt), ("WTW", f.wtw), ("CCT", f.cct), ("A", f.aConstant), ("alvo", f.target)]
-                .map { pair in "\(pair.0) \(Num.parse(pair.1) == nil ? "—" : pair.1)" }
+            func v(_ s: String) -> String { Num.parse(s) == nil ? "—" : s }
+            let k1Axis = Self.flatAxis(fromSteep: Num.parse(f.kAxis)).map { " @ \(Num.fmt($0, 0))°" } ?? ""
+            let k2Axis = Num.parse(f.kAxis) != nil ? " @ \(f.kAxis)°" : ""
+            var parts = ["AL \(v(f.al))", "K1 \(v(f.k1))\(k1Axis)", "K2 \(v(f.k2))\(k2Axis)"]
+            if f.hasTK {
+                let tkAxis = Num.parse(f.tkAxis) != nil ? " @ \(f.tkAxis)°" : ""
+                parts.append("TK1 \(f.tk1)"); parts.append("TK2 \(f.tk2)\(tkAxis)")
+            }
+            parts += ["ACD \(v(f.acd))", "LT \(v(f.lt))", "WTW \(v(f.wtw))", "CCT \(v(f.cct))", "A \(v(f.aConstant))", "alvo \(v(f.target))"]
+            if let lens = f.lens { parts.append("LIO \(lens.name)") }
             return "\(e.rawValue): " + parts.joined(separator: " | ")
         }
         let name = patientName.trimmingCharacters(in: .whitespacesAndNewlines)

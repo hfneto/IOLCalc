@@ -35,15 +35,30 @@ Na primeira abertura o app pede a **chave da API da Anthropic** (`sk-ant-…`, c
 console.anthropic.com). Ela é conferida com `GET /v1/models`, guardada no Keychain (sincronizada
 pelo iCloud Keychain para os outros aparelhos, protegida por Face ID / Touch ID ao abrir o app) e
 nunca sai dele: o laudo vai direto do app para `api.anthropic.com` (`IOLCalc/AIReader.swift`), sem
-servidor intermediário. "Trocar chave da API" fica em
-Biometria › Leitura por IA · avançado. O WordPress não é mais usado para nada.
+servidor intermediário. O modelo é fixo (`AIReader.defaultModel`, Claude Sonnet 5). "Trocar chave da
+API" fica em Configurações › Leitura por IA (engrenagem na barra do paciente) e em Biometria ›
+Leitura por IA · avançado. Depois da leitura o laudo abre ao lado da calculadora (`LaudoInspector`,
+PDFKit; folha no iPhone) para conferir os valores; ao salvar o caso, o laudo vai junto (arquivos em
+`laudos/<id>/` ao lado do `cases.json`, local e no iCloud Drive). O WordPress não é mais usado para nada.
+
+## Lentes, favoritas e ajuda
+
+`IOLCore/LensCatalog.swift` tem 59 lentes (constante A para biometria óptica, curva de defocus,
+disfotopsia, nota com a origem da constante e `curveEstimated`). O seletor da seção 2 mostra só as
+favoritas (`LensPreferences`, editáveis em Configurações › Lentes, sincronizadas pelo iCloud
+key-value store; padrão = as 20 lentes originais) e
+"Outra LIO…" abre o catálogo completo ou aceita nome/classe/constante à mão (`CustomLens`). Os
+botões "?" (`HelpTopics.swift`) explicam as opções avançadas; tudo reunido em Configurações › Ajuda.
 
 ## Calculadoras oficiais
 
 Em **4 · Calculadoras oficiais**, cada botão abre a calculadora (Barrett, Kane, ESCRS, Hill-RBF,
-Lucena) numa sheet e injeta a biometria nos campos reconhecidos por rótulo (heurística em
-`CalculatorFill.script`, a mesma do antigo bookmarklet). "Copiar biometria" põe o resumo em texto na
-área de transferência. Links externos abrem no navegador do sistema.
+Lucena) numa sheet e injeta a biometria (AL, K1/K2 e eixos, ACD, LT, WTW, CCT, TK, constante A,
+alvo, nome) nos campos reconhecidos por rótulo (heurística em `CalculatorFill.script`, injetada em
+todos os frames e repetida a cada 1,5 s até o formulário aparecer — Kane e ESCRS só o montam depois
+dos termos; Hill-RBF fica num iframe). "Copiar biometria" põe o resumo em texto na área de
+transferência. Links externos abrem no navegador do sistema. Teste sem o app:
+`Tools/filltest.swift` (ver `docs/STATUS.md`).
 
 ## Plano de migração para nativo
 
