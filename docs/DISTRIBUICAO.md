@@ -36,6 +36,22 @@ criptografia a cada build), `PrivacyInfo.xcprivacy` (sem rastreamento; UserDefau
 descrição de uso da câmera, categoria "Medical", sandbox com rede de saída e leitura de arquivos
 escolhidos pelo usuário.
 
+### Pelo terminal (feito em 17/09/2026: iOS e Mac enviados ao TestFlight assim)
+
+```bash
+cd ~/Developer/IOLCalc
+# arquivo (assinatura de desenvolvimento; a de distribuição é aplicada na exportação, gerenciada pelo Xcode)
+xcodebuild archive -scheme IOLCalc -destination 'generic/platform=iOS'   -archivePath DerivedData/Archive/IOLCalc-ios.xcarchive -allowProvisioningUpdates
+xcodebuild archive -scheme IOLCalc -destination 'generic/platform=macOS' -archivePath DerivedData/Archive/IOLCalc-mac.xcarchive -allowProvisioningUpdates
+# envio (o plist está em DerivedData/Archive/export-testflight.plist: method app-store-connect,
+# destination upload, teamID VFK4JUPXJF, signingStyle automatic, manageAppVersionAndBuildNumber)
+xcodebuild -exportArchive -archivePath DerivedData/Archive/IOLCalc-ios.xcarchive -exportOptionsPlist DerivedData/Archive/export-testflight.plist -exportPath DerivedData/Archive/export-ios -allowProvisioningUpdates
+xcodebuild -exportArchive -archivePath DerivedData/Archive/IOLCalc-mac.xcarchive -exportOptionsPlist DerivedData/Archive/export-testflight.plist -exportPath DerivedData/Archive/export-mac -allowProvisioningUpdates
+```
+
+Usa a conta Apple já entrada no Xcode; `manageAppVersionAndBuildNumber` incrementa o build sozinho.
+O `DerivedData/` não vai para o git: recrie o plist se precisar (conteúdo acima).
+
 ## Mac fora do Xcode (Developer ID)
 
 Product › Archive (destino "My Mac") › Distribute App › **Direct Distribution** (assina com Developer

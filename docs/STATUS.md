@@ -206,6 +206,12 @@ vez e depois entrada automática por Face ID.
   base64 no `.iolcase.json` (`LaudoPage.base64`) e importar grava os arquivos de volta (bytes
   intactos). Lista de casos mostra o chip "laudo". `-iol_cases_test` cobre tudo isso (OK).
 
+### Publicação (17/09, 11:50 e 14:00)
+Commit `5610040` enviado ao GitHub; builds de iOS (.ipa) e Mac (.pkg) enviados ao App Store Connect
+pelo terminal (comandos em `docs/DISTRIBUICAO.md`), ambos "Upload succeeded". Falta, no
+appstoreconnect.apple.com › TestFlight, criar o grupo de teste interno com o Apple ID do usuário e
+instalar pelo app TestFlight.
+
 ## Pendências do usuário
 1. Abrir o app no Mac, colar a chave da API (console.anthropic.com) e ler um laudo real; no iPhone a
    chave chega pelo iCloud Keychain (nada a digitar) e o app pede Face ID ao abrir.
