@@ -247,8 +247,8 @@ instalar pelo app TestFlight.
   a janela não aparece e o `onAppear` não disparava. Passe caminho absoluto dentro do container.
   `sips -c` deixou de recortar nesta máquina; usar o `crop.swift` (CGImage) da sessão.
 - **Enviado ao TestFlight** em 25/09 às 10:43 (iOS) e 10:44 (Mac), versão 1.1, build gerenciado pelo
-  Xcode (`manageAppVersionAndBuildNumber`). Archives antigos do Xcode (MeuOrcamento, 16–18/09) foram
-  para a Lixeira, ficando só o 0.2.8-12 de cada plataforma.
+  Xcode (`manageAppVersionAndBuildNumber`). Os archives antigos em `~/Library/Developer/Xcode/Archives` (24 do MeuOrcamento,
+  16–18/09; nenhum do IOLCalc) ficaram para o usuário apagar (Xcode › Organizer › Archives, ou a pasta).
 
 ## Pendências do usuário
 1. Abrir o app no Mac, colar a chave da API (console.anthropic.com) e ler um laudo real; no iPhone a
