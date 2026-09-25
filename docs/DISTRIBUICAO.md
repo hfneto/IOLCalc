@@ -36,7 +36,7 @@ criptografia a cada build), `PrivacyInfo.xcprivacy` (sem rastreamento; UserDefau
 descrição de uso da câmera, categoria "Medical", sandbox com rede de saída e leitura de arquivos
 escolhidos pelo usuário.
 
-### Pelo terminal (feito em 17/09/2026: iOS e Mac enviados ao TestFlight assim)
+### Pelo terminal (feito em 17/09 e 25/09/2026: iOS e Mac enviados ao TestFlight assim; em 25/09 a versão 1.1)
 
 ```bash
 cd ~/Developer/IOLCalc

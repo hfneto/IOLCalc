@@ -246,6 +246,9 @@ instalar pelo app TestFlight.
   `init` do app (`DebugSnapshot.runHeadlessIfRequested`) — no macOS 27, em sessão em segundo plano,
   a janela não aparece e o `onAppear` não disparava. Passe caminho absoluto dentro do container.
   `sips -c` deixou de recortar nesta máquina; usar o `crop.swift` (CGImage) da sessão.
+- **Enviado ao TestFlight** em 25/09 às 10:43 (iOS) e 10:44 (Mac), versão 1.1, build gerenciado pelo
+  Xcode (`manageAppVersionAndBuildNumber`). Archives antigos do Xcode (MeuOrcamento, 16–18/09) foram
+  para a Lixeira, ficando só o 0.2.8-12 de cada plataforma.
 
 ## Pendências do usuário
 1. Abrir o app no Mac, colar a chave da API (console.anthropic.com) e ler um laudo real; no iPhone a
