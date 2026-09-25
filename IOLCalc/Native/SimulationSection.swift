@@ -5,11 +5,32 @@ import IOLCore
 
 struct SimulationSection: View {
     @Bindable var model: CalculatorModel
+    /// Com a comparação da seção 5 ligada: mostrar o plano (false) ou o cenário alternativo (true).
+    @State private var showAlt = false
+    @State private var expanded: SimulationScene?
 
     private var anyEye: Bool { model.eyeActive(.od) || model.eyeActive(.oe) }
+    private var altActive: Bool { model.altScenarioOn && showAlt && model.altLens != nil }
+
+    private func acuities(_ scene: SimulationScene) -> [Double?] {
+        VisualSimulation.distances.map { altActive ? model.altSimulationAcuity($0, night: scene.night) : model.simulationAcuity($0, night: scene.night) }
+    }
+    private var dysphotopsia: Int { altActive ? model.altDysphotopsia() : model.simulationDysphotopsia() }
 
     var body: some View {
-        SectionCard(title: "6 · Simulação visual", trailing: AnyView(HelpButton(topic: .simulation))) {
+        SectionCard(title: "6 · Simulação visual", trailing: AnyView(
+            FlowLayout(spacing: 10) {
+                if model.altScenarioOn {
+                    Picker("", selection: $showAlt) {
+                        Text("plano").tag(false)
+                        Text("alternativa").tag(true)
+                    }
+                    .pickerStyle(.segmented).labelsHidden().frame(maxWidth: 260)
+                    MutedText(showAlt ? "cenas com \(model.altTitle) (\(model.altLens?.name ?? "—"))" : "cenas com o plano da seção 2", size: 11.5)
+                }
+                HelpButton(topic: .simulation)
+            }
+        )) {
             MutedText("Duas cenas com as três distâncias: de dia, numa cafeteria (celular na mão a 40 cm, e-mail no notebook a 66 cm, cardápio, quadros e a rua pela janela); à noite, dirigindo (celular na mão, GPS do carro a 66 cm, o carro à frente com a placa, semáforo, placas e luzes da cidade). Cada camada é desfocada pela AV binocular prevista naquela distância (lentes + residual + astigmatismo, se ligado). À noite entram a penalidade mesópica e os halos nas luzes.", size: 12.5)
             sceneBlock(.day)
             sceneBlock(.night)
@@ -24,7 +45,7 @@ struct SimulationSection: View {
     }
 
     private func sceneBlock(_ scene: SimulationScene) -> some View {
-        let acuities = VisualSimulation.distances.map { model.simulationAcuity($0, night: scene.night) }
+        let acuities = acuities(scene)
         return VStack(spacing: 0) {
             Group {
                 #if os(iOS)
@@ -43,12 +64,34 @@ struct SimulationSection: View {
             .padding(.horizontal, 10).padding(.vertical, 7)
             .background(Theme.soft)
             SimulationSceneView(scene: scene, acuities: acuities, haloMode: model.simulationHaloMode,
-                                dysphotopsia: model.simulationDysphotopsia(), astigmatism: model.simulationAstigmatism())
+                                dysphotopsia: dysphotopsia, astigmatism: model.simulationAstigmatism())
                 .aspectRatio(VisualSimulation.sceneWidth / VisualSimulation.sceneHeight, contentMode: .fit)
                 .clipped()
+                .overlay(alignment: .topTrailing) {
+                    Button { expanded = scene } label: {
+                        Image(systemName: "arrow.up.left.and.arrow.down.right")
+                            .font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
+                            .padding(7).background(.black.opacity(0.45)).clipShape(Circle())
+                    }
+                    .buttonStyle(.plain).padding(8)
+                    .accessibilityLabel("Ampliar a cena")
+                }
+                .contentShape(Rectangle())
+                .onTapGesture { expanded = scene }
         }
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.line))
+        #if os(iOS)
+        .fullScreenCover(item: $expanded) { sc in viewer(sc) }
+        #else
+        .sheet(item: $expanded) { sc in viewer(sc).frame(minWidth: 1100, minHeight: 760) }
+        #endif
+    }
+
+    private func viewer(_ scene: SimulationScene) -> some View {
+        SceneViewer(scene: scene, acuities: acuities(scene), haloMode: model.simulationHaloMode,
+                    dysphotopsia: dysphotopsia, astigmatism: model.simulationAstigmatism(),
+                    title: (scene.night ? "Noite" : "Dia") + (altActive ? " · alternativa: \(model.altTitle)" : " · plano"))
     }
 
     private func header(_ scene: SimulationScene, _ acuities: [Double?]) -> some View {
@@ -72,6 +115,64 @@ struct SimulationSection: View {
             Text("pior caso").tag(2)
         }
         .pickerStyle(.segmented).labelsHidden().fixedSize()
+    }
+}
+
+extension SimulationScene: Identifiable {
+    var id: String { imageName }
+}
+
+/// Cena ampliada (tela inteira no iPhone/iPad, folha grande no Mac) com zoom por pinça e rolagem:
+/// no celular a diferença entre as distâncias fica difícil de ver no quadro pequeno.
+struct SceneViewer: View {
+    let scene: SimulationScene
+    let acuities: [Double?]
+    let haloMode: Int
+    let dysphotopsia: Int
+    let astigmatism: (cylinder: Double, axis: Double)?
+    let title: String
+    @Environment(\.dismiss) private var dismiss
+    @State private var zoom: CGFloat = 1
+    @State private var zoomBase: CGFloat = 1
+
+    private let ratio = VisualSimulation.sceneWidth / VisualSimulation.sceneHeight
+
+    var body: some View {
+        GeometryReader { geo in
+            let fitW = min(geo.size.width, geo.size.height * ratio)
+            let w = fitW * zoom, h = w / ratio
+            ScrollView([.horizontal, .vertical], showsIndicators: false) {
+                SimulationSceneView(scene: scene, acuities: acuities, haloMode: haloMode, dysphotopsia: dysphotopsia, astigmatism: astigmatism)
+                    .frame(width: w, height: h)
+                    .frame(minWidth: geo.size.width, minHeight: geo.size.height)
+            }
+            .background(Color.black)
+            .gesture(
+                MagnifyGesture()
+                    .onChanged { v in zoom = min(4, max(1, zoomBase * v.magnification)) }
+                    .onEnded { _ in zoomBase = zoom }
+            )
+            .onTapGesture(count: 2) { withAnimation { zoom = zoom > 1 ? 1 : 2.5; zoomBase = zoom } }
+        }
+        .ignoresSafeArea()
+        .overlay(alignment: .top) {
+            HStack(spacing: 10) {
+                Text(title).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
+                ForEach(Array(VisualSimulation.distances.enumerated()), id: \.offset) { i, d in
+                    Text("\(d.id == "mid" ? "66 cm" : d.label) \(acuities[i].map { DefocusModel.snellen(fromLogMAR: $0) } ?? "—")")
+                        .font(.system(size: 12)).foregroundStyle(.white.opacity(0.85))
+                }
+                Spacer()
+                Text("pinça ou toque duplo para ampliar").font(.system(size: 11)).foregroundStyle(.white.opacity(0.6))
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark.circle.fill").font(.system(size: 26)).foregroundStyle(.white.opacity(0.9))
+                }
+                .buttonStyle(.plain).keyboardShortcut(.cancelAction)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 10)
+            .background(.black.opacity(0.55))
+        }
+        .preferredColorScheme(.dark)
     }
 }
 
@@ -118,30 +219,32 @@ struct SimulationScene {
         midScreen: Quad((0.3083, 0.3507), (0.5171, 0.3412), (0.3166, 0.5606), (0.5272, 0.5311)),
         lights: [])
 
-    /// Direção à noite (imagem gerada com o Gemini a partir da descrição do usuário).
+    /// Direção à noite (imagem gerada com o Gemini em 25/09/2026: mão esquerda com o celular, direita no
+    /// volante; recorte 14:9 da geração 3:2). Polígonos e telas medidos com `Tools/scene-tools.swift`.
     static let night = SimulationScene(
         imageName: "sim-night", night: true,
-        farPolygons: [poly([(0.04, 0.03), (1.0, 0.0), (1.0, 0.58), (0.72, 0.56), (0.40, 0.56), (0.17, 0.56), (0.05, 0.45)])],
-        nearPolygons: [poly([(0.72, 0.365), (0.885, 0.36), (0.89, 0.50), (1.0, 0.56), (1.0, 1.0), (0.70, 1.0), (0.70, 0.55)])],
-        phoneScreen: Quad((0.7351, 0.4343), (0.8655, 0.4306), (0.7405, 0.7991), (0.8750, 0.7972)),
-        midScreen: Quad((0.5935, 0.7602), (0.7660, 0.7625), (0.5964, 0.9065), (0.7680, 0.9120)),
+        farPolygons: [poly([(0.0000, 0.0000), (1.0000, 0.0000), (1.0000, 0.4704), (0.8399, 0.4454), (0.6202, 0.4046), (0.4202, 0.4000), (0.3000, 0.4296), (0.1000, 0.4296), (0.0000, 0.5000)])],
+        nearPolygons: [poly([(0.1518, 0.3130), (0.3065, 0.3130), (0.3113, 0.5000), (0.3369, 0.5204), (0.3482, 0.5556), (0.3524, 0.6111), (0.3500, 0.6667), (0.3381, 0.7315), (0.3155, 0.7870), (0.3095, 0.8130), (0.2798, 0.8380), (0.2381, 0.8815), (0.1964, 0.9278), (0.1786, 1.0000), (0.0000, 1.0000), (0.0000, 0.7759), (0.0357, 0.7407), (0.0893, 0.6667), (0.1131, 0.5926), (0.1280, 0.5185), (0.1399, 0.4444), (0.1488, 0.3704)])],
+        phoneScreen: Quad((0.1690, 0.3180), (0.3085, 0.3190), (0.1700, 0.7960), (0.3095, 0.7900)),
+        midScreen: Quad((0.5997, 0.5009), (0.7202, 0.5029), (0.5997, 0.6042), (0.7189, 0.6042)),
         lights: [
-            // semáforo
-            Light(x: 0.543, y: 0.022, radius: 0.012, strength: 1.2, color: Color(red: 1, green: 0.25, blue: 0.2)),
-            Light(x: 0.655, y: 0.022, radius: 0.012, strength: 1.2, color: Color(red: 1, green: 0.25, blue: 0.2)),
-            // carro à frente: lanternas e luz de freio
-            Light(x: 0.438, y: 0.431, radius: 0.010, strength: 1.0, color: Color(red: 1, green: 0.3, blue: 0.2)),
-            Light(x: 0.653, y: 0.433, radius: 0.010, strength: 1.0, color: Color(red: 1, green: 0.3, blue: 0.2)),
-            Light(x: 0.546, y: 0.370, radius: 0.007, strength: 0.8, color: Color(red: 1, green: 0.3, blue: 0.2)),
-            // faróis dos carros que vêm de frente
-            Light(x: 0.395, y: 0.414, radius: 0.007, strength: 1.0, color: Color(red: 1, green: 0.97, blue: 0.9)),
-            Light(x: 0.352, y: 0.414, radius: 0.006, strength: 0.9, color: Color(red: 1, green: 0.97, blue: 0.9)),
-            Light(x: 0.321, y: 0.415, radius: 0.005, strength: 0.8, color: Color(red: 1, green: 0.97, blue: 0.9)),
-            Light(x: 0.428, y: 0.370, radius: 0.005, strength: 0.7, color: Color(red: 1, green: 0.97, blue: 0.9)),
-            // postes e letreiros
-            Light(x: 0.324, y: 0.063, radius: 0.006, strength: 0.9, color: Color(red: 0.9, green: 0.95, blue: 1)),
-            Light(x: 0.643, y: 0.150, radius: 0.005, strength: 0.7, color: Color(red: 0.9, green: 0.95, blue: 1)),
-            Light(x: 0.752, y: 0.189, radius: 0.012, strength: 0.6, color: Color(red: 0.8, green: 0.9, blue: 1)),
+            // semáforos (vermelho)
+            Light(x: 0.396, y: 0.065, radius: 0.012, strength: 1.2, color: Color(red: 1, green: 0.25, blue: 0.2)),
+            Light(x: 0.494, y: 0.065, radius: 0.012, strength: 1.2, color: Color(red: 1, green: 0.25, blue: 0.2)),
+            Light(x: 0.690, y: 0.074, radius: 0.008, strength: 0.9, color: Color(red: 1, green: 0.25, blue: 0.2)),
+            // carro à frente: lanternas, luz de freio central
+            Light(x: 0.431, y: 0.420, radius: 0.011, strength: 1.0, color: Color(red: 1, green: 0.3, blue: 0.2)),
+            Light(x: 0.588, y: 0.421, radius: 0.011, strength: 1.0, color: Color(red: 1, green: 0.3, blue: 0.2)),
+            Light(x: 0.423, y: 0.298, radius: 0.006, strength: 0.7, color: Color(red: 1, green: 0.3, blue: 0.2)),
+            // faróis de carros em sentido contrário
+            Light(x: 0.335, y: 0.302, radius: 0.006, strength: 1.1, color: Color(red: 0.9, green: 0.95, blue: 1)),
+            Light(x: 0.372, y: 0.296, radius: 0.006, strength: 1.1, color: Color(red: 0.9, green: 0.95, blue: 1)),
+            // postes
+            Light(x: 0.353, y: 0.153, radius: 0.009, strength: 1.0, color: Color(red: 1, green: 0.98, blue: 0.9)),
+            Light(x: 0.956, y: 0.057, radius: 0.016, strength: 1.0, color: Color(red: 1, green: 0.98, blue: 0.92)),
+            Light(x: 0.783, y: 0.249, radius: 0.007, strength: 0.8, color: Color(red: 1, green: 0.98, blue: 0.92)),
+            Light(x: 0.738, y: 0.318, radius: 0.010, strength: 0.7, color: Color(red: 1, green: 0.98, blue: 0.95)),
+            Light(x: 0.762, y: 0.319, radius: 0.010, strength: 0.7, color: Color(red: 1, green: 0.98, blue: 0.95)),
         ])
 
     func path(_ polys: [[CGPoint]], width W: Double, height H: Double) -> Path {

@@ -88,7 +88,8 @@ seção 7 (planejamento tórico com diagrama arrastável), todas calculando com 
   iPhone (390 pt) para conferir o layout compacto no Mac (`-iol_snapshot_width 1100` renderiza a
   página na largura do Mac); no simulador, `-iol_scroll_section <1…8>` rola até a seção ao abrir;
   `-iol_cases_test <txt>`
-  faz um ciclo salvar/atualizar/recarregar/apagar num JSON temporário e grava "OK" no fim;
+  faz um ciclo salvar/atualizar/recarregar/apagar num JSON temporário e grava "OK" no fim (caminho absoluto no container);
+  `-iol_monovision YES` e `-iol_alt YES` ligam a monovisão e o cenário alternativo no caso de exemplo;
   `-iol_no_keychain YES` pula o Keychain (um binário recém-compilado faria o sistema pedir confirmação
   e travaria a captura). Se o app já estiver aberto pelo Xcode, o macOS não abre a janela de uma
   segunda instância: compile a cópia de captura com outro bundle id

@@ -44,8 +44,11 @@ enum DebugSnapshot {
         }
         if let path = d.string(forKey: "iol_phone_snapshot") {
             // tela inteira na largura de iPhone (390 pt); use com `-iol_force_compact YES -iol_sample YES`
+            // (`-iol_alt YES` liga a comparação com o cenário alternativo; `-iol_monovision YES` a monovisão)
             let model = CalculatorModel()
             model.fillSample()
+            if d.bool(forKey: "iol_monovision") { model.setDominant(.od); model.setMonovision(true) }
+            if d.bool(forKey: "iol_alt") { model.altScenarioOn = true }
             let page = CalculatorPage(model: model, store: CaseStore(fileURL: FileManager.default.temporaryDirectory.appendingPathComponent("phone-snapshot-cases.json")),
                                       showReport: .constant(false), showCases: .constant(false))
             let width = max(320, d.double(forKey: "iol_snapshot_width") == 0 ? 390 : d.double(forKey: "iol_snapshot_width"))
@@ -203,11 +206,24 @@ enum DebugSnapshot {
         }
     }
 
-    @MainActor static func runIfRequested() {
+    /// Parte sem janela (testes e renders por `ImageRenderer`): roda no `init` do app, porque em
+    /// sessões em segundo plano (macOS 27) a janela pode nem aparecer e o `onAppear` não dispara.
+    /// Se nenhum `-iol_snapshot` de janela foi pedido, encerra o app ao terminar.
+    @MainActor static func runHeadlessIfRequested() {
+        let d = UserDefaults.standard
+        let keys = ["iol_prep_test", "iol_cases_test", "iol_chart_snapshot", "iol_toric_snapshot", "iol_phone_snapshot",
+                    "iol_calcs_snapshot", "iol_report_snapshot", "iol_report_pdf", "iol_sim_snapshot"]
+        guard keys.contains(where: { d.string(forKey: $0) != nil }) else { return }
         prepTestIfRequested()
         casesTestIfRequested()
         renderChartIfRequested()
         renderSectionsIfRequested()
+        if d.string(forKey: "iol_snapshot") == nil, d.string(forKey: "iol_popup_test") == nil {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { NSApp.terminate(nil) }
+        }
+    }
+
+    @MainActor static func runIfRequested() {
         guard let path = UserDefaults.standard.string(forKey: "iol_snapshot") else { return }
         let height = UserDefaults.standard.double(forKey: "iol_snapshot_height")
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {

@@ -88,9 +88,18 @@ final class CalculatorModel {
     var simulationNight = false
     /// Variação individual dos halos: 0 melhor caso, 1 mais comum, 2 pior caso.
     var simulationHaloMode = 1
-    // Seção 7
+    // Seção 7 (padrões do usuário aplicados no init e em "Limpar")
     var odToric = ToricForm(siaAxis: "180")
     var oeToric = ToricForm(siaAxis: "0")
+    // Olho dominante e monovisão (seção 2)
+    var dominantEye: Eye?
+    var monovisionOn = false
+    /// Miopia (D, positivo) deixada no olho não dominante; começa pelo padrão do usuário.
+    var monovisionAmount = "1,25"
+    // Cenário alternativo (seções 5 e 6): monovisão monofocal quando o plano é multifocal, ou
+    // multifocal bilateral quando o plano é monovisão.
+    var altScenarioOn = false
+    var altLensID = ""
     // Comparador
     var compareEye: Eye = .od
     var compareA = ""
@@ -108,7 +117,12 @@ final class CalculatorModel {
             d[m] = defaults.string(forKey: Self.deltaKey(m)) ?? Num.fmt(m.defaultDeltaA)
         }
         deltaA = d
-        if defaults.bool(forKey: "iol_sample") { fillSample() }
+        applyPlanningDefaults()
+        if defaults.bool(forKey: "iol_sample") {
+            fillSample()
+            if defaults.bool(forKey: "iol_monovision") { setDominant(.od); setMonovision(true) }
+            if defaults.bool(forKey: "iol_alt") { altScenarioOn = true }
+        }
         // Depuração: `-iol_ai_fake_file <arquivo>` aplica o texto do arquivo como se fosse a resposta
         // da IA (por arquivo porque um argumento começando com "{" é lido como plist pelo UserDefaults).
         if let path = defaults.string(forKey: "iol_ai_fake_file"), let fake = try? String(contentsOfFile: path, encoding: .utf8),
@@ -231,8 +245,93 @@ final class CalculatorModel {
         patientName = ""
         od.clearBiometry()
         oe.clearBiometry()
+        applyPlanningDefaults()
         loadedCaseID = nil
     }
+
+    /// Padrões do usuário (Configurações › Padrões): SIA e eixo da incisão, quantidade da
+    /// monovisão e lente do cenário alternativo. Chamado ao abrir o app e em "Limpar".
+    func applyPlanningDefaults() {
+        let d = PlanningDefaults.shared
+        odToric = ToricForm.fromDefaults(.od)
+        oeToric = ToricForm.fromDefaults(.oe)
+        monovisionAmount = d.monovisionAmount
+        altLensID = monovisionOn ? d.multifocalLensID : d.monovisionLensID
+    }
+
+    // MARK: - Olho dominante e monovisão
+
+    /// Miopia da monovisão (D, positivo), limitada a 3 D.
+    var monovisionValue: Double { min(3, max(0, Num.parse(monovisionAmount) ?? 0)) }
+
+    func setDominant(_ eye: Eye?) {
+        dominantEye = eye
+        if monovisionOn { applyMonovisionTargets() }
+    }
+
+    /// Liga/desliga a monovisão: alvo 0 no dominante e −miopia no outro; ao desligar, 0 nos dois.
+    func setMonovision(_ on: Bool) {
+        monovisionOn = on
+        if on {
+            if dominantEye == nil { dominantEye = .od }
+            applyMonovisionTargets()
+        } else {
+            setTarget("0,00", for: .od); setTarget("0,00", for: .oe)
+        }
+        // o cenário alternativo é o oposto do plano
+        let d = PlanningDefaults.shared
+        altLensID = on ? d.multifocalLensID : d.monovisionLensID
+    }
+
+    func setMonovisionAmount(_ text: String) {
+        monovisionAmount = text
+        if monovisionOn { applyMonovisionTargets() }
+    }
+
+    private func applyMonovisionTargets() {
+        let dom = dominantEye ?? .od
+        for eye in Eye.allCases {
+            setTarget(eye == dom ? "0,00" : "-" + Num.fmt(monovisionValue), for: eye)
+        }
+    }
+
+    // MARK: - Cenário alternativo (seções 5 e 6)
+
+    /// O plano atual é monovisão ⇒ a alternativa é multifocal bilateral; senão, monovisão monofocal.
+    var altIsMonovision: Bool { !monovisionOn }
+    var altTitle: String { altIsMonovision ? "monovisão monofocal" : "multifocal bilateral" }
+    var altLens: IOLLens? { LensCatalog.lens(id: altLensID) }
+
+    /// Alvo do cenário alternativo por olho.
+    func altTarget(_ eye: Eye) -> Double {
+        guard altIsMonovision else { return 0 }
+        let dom = dominantEye ?? .od
+        return eye == dom ? 0 : -PlanningDefaults.shared.monovisionValueOr(monovisionAmount)
+    }
+
+    /// Residual esférico do cenário alternativo: cálculo com a constante A da lente alternativa e
+    /// o alvo do cenário (sem biometria, o próprio alvo).
+    func altResidual(_ eye: Eye) -> Double? {
+        guard let lens = altLens else { return nil }
+        let target = altTarget(eye)
+        guard let bio = self[eye].biometry else { return target }
+        return PowerPlanner.plan(eye: bio, aConstant: lens.aConstant, method: method, deltaA: currentDeltaA, target: target).chosen.residual
+    }
+
+    func altMonocularVA(_ eye: Eye, at d: Double) -> Double? {
+        guard self[eye].enabled, let lens = altLens, let r = altResidual(eye) else { return nil }
+        return DefocusModel.monocularVA(curve: lens.defocusValues, residual: r, defocus: d, cylinder: effectiveCylinder(eye))
+    }
+
+    func altBinocularVA(at d: Double) -> Double? {
+        DefocusModel.binocularVA(altMonocularVA(.od, at: d), altMonocularVA(.oe, at: d))
+    }
+
+    func altSimulationAcuity(_ d: VisualSimulation.Distance, night: Bool) -> Double? {
+        altBinocularVA(at: d.defocus).map { VisualSimulation.acuity($0, night: night) }
+    }
+
+    func altDysphotopsia() -> Int { altLens?.dysphotopsia ?? 0 }
 
     // MARK: - Casos salvos
 
@@ -241,7 +340,9 @@ final class CalculatorModel {
     func snapshot() -> CaseSnapshot {
         CaseSnapshot(patientName: patientName, od: od, oe: oe, odToric: odToric, oeToric: oeToric, method: method,
                      astigmatismOn: astigmatismOn, showMonocular: showMonocular, simulationNight: simulationNight,
-                     simulationHaloMode: simulationHaloMode, compareEye: compareEye, compareA: compareA, compareB: compareB)
+                     simulationHaloMode: simulationHaloMode, compareEye: compareEye, compareA: compareA, compareB: compareB,
+                     dominantEye: dominantEye, monovisionOn: monovisionOn, monovisionAmount: monovisionAmount,
+                     altScenarioOn: altScenarioOn, altLensID: altLensID)
     }
 
     func restore(_ c: CaseSnapshot, caseID: UUID?) {
@@ -252,6 +353,11 @@ final class CalculatorModel {
         astigmatismOn = c.astigmatismOn; showMonocular = c.showMonocular
         simulationNight = c.simulationNight; simulationHaloMode = c.simulationHaloMode
         compareEye = c.compareEye; compareA = c.compareA; compareB = c.compareB
+        dominantEye = c.dominantEye
+        monovisionOn = c.monovisionOn ?? false
+        monovisionAmount = c.monovisionAmount ?? PlanningDefaults.shared.monovisionAmount
+        altScenarioOn = c.altScenarioOn ?? false
+        altLensID = c.altLensID ?? (monovisionOn ? PlanningDefaults.shared.multifocalLensID : PlanningDefaults.shared.monovisionLensID)
         loadedCaseID = caseID
     }
 
@@ -312,7 +418,13 @@ struct ToricForm: Equatable, Codable {
     struct PlatformChoice: Equatable, Codable { var lensID: String; var id: String }
     struct RatioChoice: Equatable, Codable { var platformID: String; var text: String }
 
-    init(siaAxis: String) { self.siaAxis = siaAxis }
+    init(siaAxis: String, sia: String = "0,10") { self.siaAxis = siaAxis; self.sia = sia }
+
+    /// Valores padrão do usuário (Configurações › Padrões) para um olho.
+    static func fromDefaults(_ eye: Eye) -> ToricForm {
+        let d = PlanningDefaults.shared
+        return ToricForm(siaAxis: d.incisionAxis(eye), sia: d.sia)
+    }
 }
 
 /// Razão de toricidade em vigor e a sua origem.
@@ -464,7 +576,8 @@ extension CalculatorModel {
 /// Números no padrão brasileiro (vírgula), aceitando ponto na digitação.
 enum Num {
     static func parse(_ s: String) -> Double? {
-        let t = s.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: ",", with: ".")
+        // aceita vírgula e o sinal de menos tipográfico (U+2212) que o próprio `fmt` produz
+        let t = s.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: ",", with: ".").replacingOccurrences(of: "−", with: "-")
         guard !t.isEmpty, let v = Double(t), v.isFinite else { return nil }
         return v
     }

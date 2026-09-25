@@ -212,6 +212,41 @@ pelo terminal (comandos em `docs/DISTRIBUICAO.md`), ambos "Upload succeeded". Fa
 appstoreconnect.apple.com › TestFlight, criar o grupo de teste interno com o Apple ID do usuário e
 instalar pelo app TestFlight.
 
+## Rodada de 25/09 (correções e ajustes pedidos pelo usuário)
+- **Diagrama tórico "fixo"** (`ToricSection.swift`): cadeado sobre cada diagrama, fechado por padrão —
+  o `Canvas` não recebe gesto (`.gesture(_, including: .subviews)`), então rolar a tela no iPhone não
+  mexe nos eixos. Aberto, só as alças respondem (marca da incisão ou as duas pontas do eixo da LIO,
+  raio 32 pt) e o arrasto exige 6 pt de deslocamento. Tocar fora das alças não faz nada.
+- **Configurações › Padrões** (`PlanningDefaults.swift`, `SettingsSheet.PlanningSettings`): SIA, eixo
+  da incisão OD/OE, miopia da monovisão, monofocal e multifocal de referência. UserDefaults + iCloud
+  KVS (`iol_planning_defaults`). Aplicados no `init` do modelo e em "Limpar"
+  (`CalculatorModel.applyPlanningDefaults`); um caso aberto mantém o que foi gravado.
+- **Olho dominante e monovisão** (seção 2, `dominanceRow`): segmentado OD/OE/— e "Monovisão" com o
+  campo de miopia; ligar põe alvo 0,00 no dominante e −miopia no outro (`setMonovision`,
+  `applyMonovisionTargets`; sem dominante marcado assume OD). No `CaseSnapshot` entram
+  `dominantEye`, `monovisionOn`, `monovisionAmount`, `altScenarioOn`, `altLensID` (opcionais, para
+  abrir casos antigos). Bug encontrado no caminho: `Num.fmt` gera o menos tipográfico (U+2212) e
+  `Num.parse` não o lia — agora lê; os alvos usam "-" ASCII.
+- **Cenário alternativo** (seções 5 e 6): "comparar com monovisão monofocal" (plano multifocal) ou
+  "comparar com multifocal bilateral" (plano monovisão). Curva binocular tracejada laranja
+  (`Theme.alt`), linha com as AV das três distâncias dos dois cenários, e na seção 6 o segmentado
+  "plano / alternativa" troca as cenas. Residuais do cenário calculados com a constante A da lente
+  alternativa e a mesma biometria (`altResidual`, `altBinocularVA`, `altSimulationAcuity`).
+- **Simulação ampliável** (`SceneViewer`): toque na cena ou no botão de ampliar → tela inteira
+  (iOS) / folha grande (Mac) com pinça e toque duplo (zoom até 4×, o `Canvas` é redesenhado no
+  tamanho ampliado, sem perder nitidez), AV das três distâncias no topo.
+- **Cena noturna nova** (Gemini, prompt em `docs/simulacao-prompts.md`): mão esquerda com o celular
+  em primeiro plano, direita no volante, sem a terceira mão. Telas medidas com `scene-tools screen`
+  (celular por preenchimento, GPS com o ajuste "fit"), silhueta da mão/celular/manga traçada com 22
+  vértices na grade, luzes marcadas à mão (semáforos, lanternas, faróis, postes).
+- **iPhone**: `CompactMenuPicker` (Theme) para seletores de menu com títulos longos (quebravam em
+  várias linhas); usado na lente alternativa. Conferido no simulador iPhone 17 (seções 2, 5, 6, 7).
+- **Depuração**: `-iol_monovision YES` e `-iol_alt YES` ligam monovisão e comparação no caso de
+  exemplo; os testes sem janela (`-iol_cases_test`, renders por `ImageRenderer`) agora rodam no
+  `init` do app (`DebugSnapshot.runHeadlessIfRequested`) — no macOS 27, em sessão em segundo plano,
+  a janela não aparece e o `onAppear` não disparava. Passe caminho absoluto dentro do container.
+  `sips -c` deixou de recortar nesta máquina; usar o `crop.swift` (CGImage) da sessão.
+
 ## Pendências do usuário
 1. Abrir o app no Mac, colar a chave da API (console.anthropic.com) e ler um laudo real; no iPhone a
    chave chega pelo iCloud Keychain (nada a digitar) e o app pede Face ID ao abrir.

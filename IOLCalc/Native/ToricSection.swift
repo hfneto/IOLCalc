@@ -32,6 +32,7 @@ private struct ToricCard: View {
     let eye: Eye
     @Bindable var model: CalculatorModel
     @State private var showAdvanced = false
+    @State private var unlocked = false
 
     private let columns = [GridItem(.adaptive(minimum: 100), spacing: 8)]
 
@@ -107,9 +108,24 @@ private struct ToricCard: View {
                 PillButton(title: "alinhar ao astig.") { model.alignToricToTotal(eye) }
             }
 
-            ToricDiagram(plan: plan) { target, angle in
+            ToricDiagram(plan: plan, interactive: unlocked) { target, angle in
                 let text = Num.fmt(angle, 0)
                 if target == .incision { model[toric: eye].siaAxis = text } else { model[toric: eye].iolAxis = text }
+            }
+            .overlay(alignment: .topTrailing) {
+                // Cadeado: fechado, o diagrama não responde ao toque (rolar a tela não mexe nos
+                // eixos); aberto, só as alças (pontas do eixo da LIO e a incisão) arrastam.
+                Button { unlocked.toggle() } label: {
+                    Label(unlocked ? "arrastar ligado" : "arrastar", systemImage: unlocked ? "lock.open.fill" : "lock.fill")
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundStyle(unlocked ? .white : Theme.brand)
+                        .padding(.horizontal, 9).padding(.vertical, 5)
+                        .background(unlocked ? Theme.brand : Color.white)
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(Theme.brand.opacity(0.6)))
+                }
+                .buttonStyle(.plain).padding(8)
+                .accessibilityLabel(unlocked ? "Travar os eixos" : "Liberar o arrasto dos eixos")
             }
             .frame(maxWidth: 440)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -153,9 +169,11 @@ private struct ToricCard: View {
 /// Diagrama polar do olho: astigmatismo total (roxo), eixo da LIO (verde, arrastável pelas
 /// alças), residual (vermelho) e incisão (laranja, arrastável). Porte do `drawToric` da web.
 struct ToricDiagram: View {
-    enum DragTarget { case incision, iol }
+    enum DragTarget { case incision, iol, none }
 
     let plan: ToricPlan
+    /// `false` (padrão): o diagrama é só desenho — o toque passa para a rolagem da tela.
+    var interactive = false
     /// Chamado durante o arrasto com o ângulo (0–180°) já arredondado.
     let onDrag: (DragTarget, Double) -> Void
 
@@ -173,7 +191,7 @@ struct ToricDiagram: View {
                 draw(&ctx, size: size)
             }
             .contentShape(Rectangle())
-            .gesture(gesture(side: side))
+            .gesture(gesture(side: side), including: interactive ? .all : .subviews)
         }
         .aspectRatio(1, contentMode: .fit)
         .background(Color.white)
@@ -182,15 +200,28 @@ struct ToricDiagram: View {
         .accessibilityLabel("Diagrama do astigmatismo")
     }
 
-    /// O alvo (incisão ou eixo da LIO) é decidido pelo ponto inicial do toque, como na web.
+    /// O alvo é decidido pelo ponto inicial do toque: a marca da incisão ou uma das pontas do eixo
+    /// da LIO. Tocar longe das alças não move nada, e o arrasto só começa depois de alguns pontos.
     private func gesture(side: CGFloat) -> some Gesture {
-        DragGesture(minimumDistance: 0, coordinateSpace: .local)
+        DragGesture(minimumDistance: 6, coordinateSpace: .local)
             .onChanged { v in
-                if dragging == nil { dragging = nearIncision(v.startLocation, side: side) ? .incision : .iol }
-                guard let dragging else { return }
+                if dragging == nil {
+                    if nearIncision(v.startLocation, side: side) { dragging = .incision }
+                    else if nearIOLHandle(v.startLocation, side: side) { dragging = .iol }
+                    else { dragging = .none }
+                }
+                guard let dragging, dragging != .none else { return }
                 onDrag(dragging, angle(of: v.location, side: side))
             }
             .onEnded { _ in dragging = nil }
+    }
+
+    /// Perto de uma das pontas do eixo da LIO (verde)?
+    private func nearIOLHandle(_ p: CGPoint, side: CGFloat) -> Bool {
+        let c = side / 2, r = side * 0.40 * 0.82, k = side / 440
+        let a = plan.input.iolAxis * .pi / 180
+        let ends = [CGPoint(x: c + cos(a) * r, y: c - sin(a) * r), CGPoint(x: c - cos(a) * r, y: c + sin(a) * r)]
+        return ends.contains { hypot(p.x - $0.x, p.y - $0.y) < 32 * k }
     }
 
     private func angle(of p: CGPoint, side: CGFloat) -> Double {

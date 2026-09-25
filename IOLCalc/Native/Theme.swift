@@ -20,6 +20,8 @@ enum Theme {
     static let errInk = Color(hex: 0x991b1b)
     static let chipBg = Color(hex: 0xe2e8f0)
     static let chipInk = Color(hex: 0x475569)
+    /// Cenário alternativo (seção 5/6): laranja.
+    static let alt = Color(hex: 0xea580c)
     static let bino = Color(hex: 0x7c3aed)
     static let warn = Color(hex: 0xd97706)
 
@@ -92,6 +94,31 @@ struct AdaptiveHStack<Content: View>: View {
 }
 
 // MARK: - Componentes
+
+/// Seletor de menu cujo rótulo não quebra linha: no iPhone o `Picker` de menu quebra títulos longos
+/// em várias linhas sobre os vizinhos; aqui o rótulo é o título da opção escolhida, em uma linha
+/// (truncado), e o menu mostra os títulos completos.
+struct CompactMenuPicker<ID: Hashable>: View {
+    @Binding var selection: ID
+    let options: [(id: ID, title: String)]
+    var maxWidth: CGFloat = 220
+
+    var body: some View {
+        Menu {
+            Picker("", selection: $selection) {
+                ForEach(options, id: \.id) { Text($0.title).tag($0.id) }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text(options.first { $0.id == selection }?.title ?? "—").lineLimit(1).truncationMode(.tail)
+                Image(systemName: "chevron.up.chevron.down").font(.caption2.weight(.semibold))
+            }
+            .frame(maxWidth: maxWidth, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+}
 
 /// Cartão branco de seção (raio 14, borda cinza).
 struct SectionCard<Content: View>: View {

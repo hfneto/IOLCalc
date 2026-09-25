@@ -15,6 +15,7 @@ enum HelpTopic: String, CaseIterable, Identifiable {
     case toricBase
     case toricPlatform
     case cases
+    case monovision
 
     var id: String { rawValue }
 
@@ -32,6 +33,7 @@ enum HelpTopic: String, CaseIterable, Identifiable {
         case .toricBase: return "Base do astigmatismo e SIA (seção 7)"
         case .toricPlatform: return "Plataforma e razão de toricidade (seção 7)"
         case .cases: return "Casos salvos e iCloud"
+        case .monovision: return "Olho dominante, monovisão e cenário alternativo"
         }
     }
 
@@ -84,9 +86,14 @@ enum HelpTopic: String, CaseIterable, Identifiable {
             "O seletor de halos (melhor caso / mais comum / pior caso) mostra a variação individual entre pacientes com a mesma lente; use-o na conversa pré-operatória, não como previsão para aquela pessoa.",
             "A calibração está descrita no rodapé da seção: σ do desfoque proporcional ao MAR, 2 px por minuto de arco, +0,08 logMAR à noite, perda de contraste das difrativas.",
         ]
+        case .monovision: return [
+            "Marque o olho dominante (teste do buraco no cartão ou o olho que o paciente usa para mirar). Com \"Monovisão\" ligada, o app põe alvo 0,00 D no dominante e −miopia no outro olho (quantidade em Configurações › Padrões, ajustável por caso; 1,00–1,50 D é a faixa mais tolerada, acima de 2,00 D perde estereopsia). Desligando, os dois alvos voltam a 0,00 D.",
+            "Na seção 5, \"comparar com…\" desenha uma segunda curva binocular tracejada com o cenário oposto: se o plano é multifocal, a alternativa é monovisão com uma monofocal; se o plano é monovisão, a alternativa é a multifocal bilateral escolhida. Os residuais do cenário são calculados com a constante A da lente alternativa e a mesma biometria.",
+            "Na seção 6, com a comparação ligada, o seletor \"plano / alternativa\" troca as cenas entre os dois cenários para mostrar ao paciente a diferença nas três distâncias.",
+        ]
         case .toricBase: return [
             "\"Base do astigmatismo\" define de onde vem o astigmatismo corneano total: K anterior puro; Abulafia-Koch (regressão que estima a córnea posterior a partir do K anterior — padrão quando não há TK); Næser-Savini (outra regressão); ou Total (TK medido, escolhido automaticamente quando há TK na biometria).",
-            "SIA é o astigmatismo induzido pela incisão (vetor cujo meridiano curvo fica a 90° do eixo da incisão, que aplana o próprio meridiano). O padrão 0,10 D é o centroide típico de incisões temporais de 2,2–2,4 mm; use o seu valor se o tiver medido. O eixo da incisão pode ser arrastado no diagrama (laranja).",
+            "SIA é o astigmatismo induzido pela incisão (vetor cujo meridiano curvo fica a 90° do eixo da incisão, que aplana o próprio meridiano). O padrão 0,10 D é o centroide típico de incisões temporais de 2,2–2,4 mm; use o seu valor se o tiver medido. O eixo da incisão pode ser arrastado no diagrama (laranja) depois de abrir o cadeado; com ele fechado, o diagrama não responde ao toque, para não mudar os eixos sem querer ao rolar a tela.",
             "O residual é a soma vetorial (duplo-ângulo) de astigmatismo total, SIA e cilindro da LIO no plano corneano. \"Sugerir ideal\" escolhe o degrau da plataforma mais próximo do necessário e alinha ao meridiano curvo total; \"alinhar ao astig.\" só corrige o eixo. A nota de desalinhamento mostra quanto se perde a cada grau de rotação.",
         ]
         case .toricPlatform: return [

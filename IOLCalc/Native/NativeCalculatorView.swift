@@ -245,6 +245,8 @@ struct LensSection: View {
             }
             .tint(Theme.muted)
 
+            dominanceRow
+
             EyePair { eye in
                 LensCard(eye: eye, model: model)
             }
@@ -260,6 +262,38 @@ struct LensSection: View {
             .toggleStyle(.button)
             #endif
             .font(.system(size: 12.5)).foregroundStyle(Theme.ink)
+        }
+    }
+
+    /// Olho dominante e monovisão: com a monovisão ligada, o alvo do dominante é 0 e o do outro
+    /// olho é −miopia (seção 2); o valor começa pelo padrão de Configurações.
+    private var dominanceRow: some View {
+        FlowLayout(spacing: 14) {
+            HStack(spacing: 8) {
+                FieldLabel(text: "Olho dominante")
+                Picker("", selection: Binding(get: { model.dominantEye }, set: { model.setDominant($0) })) {
+                    Text("OD").tag(Eye?.some(.od))
+                    Text("OE").tag(Eye?.some(.oe))
+                    Text("—").tag(Eye?.none)
+                }
+                .pickerStyle(.segmented).labelsHidden().fixedSize()
+            }
+            Toggle("Monovisão", isOn: Binding(get: { model.monovisionOn }, set: { model.setMonovision($0) }))
+                #if os(macOS)
+                .toggleStyle(.checkbox)
+                #else
+                .toggleStyle(.button)
+                #endif
+                .font(.system(size: 12.5)).foregroundStyle(Theme.ink)
+                .fixedSize()
+            if model.monovisionOn {
+                NumberField(label: "miopia no não dominante (D)",
+                            text: Binding(get: { model.monovisionAmount }, set: { model.setMonovisionAmount($0) }))
+                    .frame(width: 190)
+                MutedText("\(model.dominantEye?.rawValue ?? "OD") alvo 0,00 · \(model.dominantEye == .oe ? "OD" : "OE") alvo \(Num.fmt(-model.monovisionValue)) D", size: 11.5)
+                    .fixedSize()
+            }
+            HelpButton(topic: .monovision)
         }
     }
 

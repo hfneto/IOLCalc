@@ -13,7 +13,26 @@ Photorealistic first-person point-of-view photograph, seen through the eyes of a
 Everything must be sharp and in focus from the phone to the street (deep depth of field, small aperture). Natural daylight, soft shadows, realistic colors, 28 mm lens, no motion blur, no bokeh, no people's faces in the foreground, no text on the screens.
 ```
 
-## Noite — direção
+## Noite — direção (versão de 25/09/2026: mão esquerda com o celular, direita no volante)
+
+A versão anterior saía com três mãos (a do passageiro segurando o celular mais as duas do
+motorista). Geração em 3:2 (2528×1696) → escala para 1680 de largura → recorte 14:9 tirando 47 px
+do topo (`Tools`: `crop.swift` na sessão). Três candidatas; escolhida a que tinha o celular mais
+frontal e a silhueta da mão mais limpa.
+
+```
+Photorealistic first-person point-of-view photograph from the driver's seat of a car at night, looking straight through the windshield. Exactly two hands are visible in the whole image, both belonging to the driver:
+- The driver's RIGHT hand rests on the steering wheel at the 3 o'clock position, lower left of center of the frame.
+- The driver's LEFT hand, in the lower LEFT foreground, holds a modern smartphone up toward the camera at reading distance (about 40 cm), the screen facing the camera and nearly frontal (tilted at most 10 degrees); the screen is completely blank, plain dark gray, no interface, no reflections on it.
+No other hands, arms or people inside the car.
+Composition from near to far:
+- Center of the dashboard (about 65 cm away): a car infotainment navigation screen, completely blank dark screen, no interface, seen almost frontally; illuminated instrument cluster behind the wheel.
+- Through the windshield, close ahead: a car stopped at an intersection, its rear license plate large and clearly legible, brake lights on.
+- Above the intersection a traffic light showing red; on the right, road signs with legible text; illuminated storefront signs, street lamps and the headlights of oncoming cars in the distance.
+Everything must be sharp and in focus from the phone to the traffic light (deep depth of field). The phone and the hand holding it must stand out clearly against the dark interior, with a clean, well-defined silhouette. Realistic night exposure, clean windshield, no rain, no motion blur, no bokeh, no lens flare, no text on the screens. 28 mm lens.
+```
+
+## Noite — direção (versão original de 12/09, substituída)
 
 ```
 Photorealistic first-person point-of-view photograph from the driver's seat of a car at night, looking straight through the windshield, the driver's two hands on the steering wheel in the lower part of the frame. Composition, from near to far:

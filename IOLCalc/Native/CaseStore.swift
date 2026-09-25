@@ -19,6 +19,12 @@ struct CaseSnapshot: Codable, Equatable {
     var compareEye: Eye
     var compareA: String
     var compareB: String
+    // Campos de 25/09 (opcionais para abrir casos gravados antes)
+    var dominantEye: Eye?
+    var monovisionOn: Bool?
+    var monovisionAmount: String?
+    var altScenarioOn: Bool?
+    var altLensID: String?
 }
 
 /// Uma página do laudo guardada com o caso. Os bytes ficam em `laudos/<id do caso>/<fileName>`

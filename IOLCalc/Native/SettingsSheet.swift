@@ -9,10 +9,13 @@ struct SettingsSheet: View {
     @State private var tab: Tab = .lenses
 
     enum Tab: String, CaseIterable, Identifiable {
-        case lenses = "Lentes", ai = "Leitura por IA", help = "Ajuda"
+        case lenses = "Lentes", defaults = "Padrões", ai = "Leitura por IA", help = "Ajuda"
         var id: String { rawValue }
         var icon: String {
-            switch self { case .lenses: return "star"; case .ai: return "doc.text.viewfinder"; case .help: return "questionmark.circle" }
+            switch self {
+            case .lenses: return "star"; case .defaults: return "slider.horizontal.3"
+            case .ai: return "doc.text.viewfinder"; case .help: return "questionmark.circle"
+            }
         }
     }
 
@@ -26,6 +29,7 @@ struct SettingsSheet: View {
                 .padding(.horizontal, 16).padding(.top, 10).padding(.bottom, 6)
                 switch tab {
                 case .lenses: LensSettings()
+                case .defaults: PlanningSettings()
                 case .ai: AISettings(reader: reader)
                 case .help: HelpSettings()
                 }
@@ -90,6 +94,63 @@ struct LensSettings: View {
         #if os(macOS)
         .listStyle(.inset)
         #endif
+    }
+}
+
+// MARK: - Padrões do planejamento
+
+/// SIA e incisão padrão, monovisão e lentes do cenário alternativo. Valem para casos novos (e para
+/// "Limpar"); um caso aberto mantém os valores gravados nele. Sincronizado pelo iCloud.
+struct PlanningSettings: View {
+    @State private var prefs = PlanningDefaults.shared
+
+    private var monofocals: [IOLLens] { LensCatalog.all.filter { $0.category == .monofocal || $0.category == .enhancedMonofocal } }
+    private var multifocals: [IOLLens] { LensCatalog.all.filter { $0.category != .monofocal && $0.category != .enhancedMonofocal } }
+
+    var body: some View {
+        Form {
+            Section("Incisão (seção 7)") {
+                LabeledContent("SIA (D)") { field($prefs.sia, width: 80) }
+                LabeledContent("Eixo da incisão OD (°)") { field($prefs.incisionAxisOD, width: 80) }
+                LabeledContent("Eixo da incisão OE (°)") { field($prefs.incisionAxisOE, width: 80) }
+                Text("Temporal: 180° no OD e 0° no OE. Superior: 90° nos dois. O SIA de 0,10 D é o centroide típico de incisões de 2,2–2,4 mm; use o seu valor medido se o tiver.")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+            Section("Monovisão (seção 2)") {
+                LabeledContent("Miopia no olho não dominante (D)") { field($prefs.monovisionAmount, width: 80) }
+                Picker("Monofocal de referência", selection: $prefs.monovisionLensID) {
+                    ForEach(monofocals) { Text("\($0.name) · \($0.manufacturer)").tag($0.id) }
+                }
+                Text("Ao ligar \"Monovisão\" num caso, o dominante fica com alvo 0,00 D e o outro olho com −\(prefs.monovisionAmount) D. A monofocal é a lente do cenário \"monovisão monofocal\" na comparação da seção 5.")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+            Section("Cenário alternativo (seções 5 e 6)") {
+                Picker("Multifocal de referência", selection: $prefs.multifocalLensID) {
+                    ForEach(multifocals) { Text("\($0.name) · \($0.manufacturer)").tag($0.id) }
+                }
+                Text("Lente do cenário \"multifocal bilateral\" quando o plano do caso é monovisão.")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+            Section {
+                Button("Restaurar padrões") { prefs.restoreDefaults() }
+                Text("Os padrões valem para casos novos e para \"Limpar\"; um caso aberto mantém o que foi gravado nele. Sincronizados pelo iCloud com os seus outros aparelhos.")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+        }
+        #if os(macOS)
+        .formStyle(.grouped)
+        #endif
+    }
+
+    private func field(_ text: Binding<String>, width: CGFloat) -> some View {
+        TextField("", text: text)
+            .multilineTextAlignment(.trailing)
+            .frame(width: width)
+            #if os(iOS)
+            .keyboardType(.numbersAndPunctuation)
+            #else
+            .textFieldStyle(.roundedBorder)
+            #endif
     }
 }
 

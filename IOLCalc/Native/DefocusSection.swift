@@ -90,9 +90,11 @@ struct DefocusSection: View {
         SectionCard(title: "5 · Curva de defocus & visão binocular", trailing: AnyView(toggles)) {
             HStack(spacing: 14) {
                 legendDot(Theme.od, "OD"); legendDot(Theme.oe, "OE"); legendDot(Theme.bino, "Binocular")
+                if model.altScenarioOn { legendDot(Theme.alt, "Alternativa") }
                 Spacer()
                 HelpButton(topic: .defocusSlider)
             }
+            altRow
             if series.isEmpty {
                 MutedText("selecione a LIO de ao menos um olho para ver as curvas")
                     .frame(maxWidth: .infinity, minHeight: 120)
@@ -120,6 +122,44 @@ struct DefocusSection: View {
         .font(.system(size: 12)).foregroundStyle(Theme.ink)
     }
 
+    /// "Comparar com…": o cenário oposto ao plano (monovisão monofocal ou multifocal bilateral),
+    /// com a lente de referência escolhida aqui (padrão em Configurações › Padrões).
+    private var altRow: some View {
+        FlowLayout(spacing: 12) {
+            Toggle("comparar com \(model.altTitle)", isOn: $model.altScenarioOn)
+                #if os(macOS)
+                .toggleStyle(.checkbox)
+                #else
+                .toggleStyle(.button)
+                #endif
+                .font(.system(size: 12)).foregroundStyle(Theme.ink)
+            if model.altScenarioOn {
+                HStack(spacing: 6) {
+                    MutedText(model.altIsMonovision ? "monofocal:" : "multifocal:")
+                    CompactMenuPicker(selection: $model.altLensID, options: altChoices.map { (id: $0.id, title: $0.name) })
+                }
+                if model.altIsMonovision {
+                    MutedText("alvos \(model.dominantEye?.rawValue ?? "OD") 0,00 · \(model.dominantEye == .oe ? "OD" : "OE") \(Num.fmt(-PlanningDefaults.shared.monovisionValueOr(model.monovisionAmount))) D", size: 11.5)
+                }
+                HelpButton(topic: .monovision)
+            }
+        }
+    }
+
+    /// Lentes oferecidas para o cenário alternativo: monofocais (monovisão) ou as favoritas não
+    /// monofocais (multifocal bilateral); a escolhida entra mesmo fora da lista.
+    private var altChoices: [IOLLens] {
+        let favs = LensPreferences.shared.favorites
+        var list: [IOLLens]
+        if model.altIsMonovision {
+            list = LensCatalog.all.filter { $0.category == .monofocal || $0.category == .enhancedMonofocal }
+        } else {
+            list = LensCatalog.all.filter { favs.contains($0.id) && $0.category != .monofocal && $0.category != .enhancedMonofocal }
+        }
+        if let cur = model.altLens, !list.contains(where: { $0.id == cur.id }) { list.insert(cur, at: 0) }
+        return list
+    }
+
     private func legendDot(_ color: Color, _ label: String) -> some View {
         HStack(spacing: 5) {
             RoundedRectangle(cornerRadius: 3).fill(color).frame(width: 11, height: 11)
@@ -135,6 +175,9 @@ struct DefocusSection: View {
         if let bino = DefocusSeries.sampled(id: "Binocular", color: Theme.bino, width: 3) { model.binocularVA(at: $0) } {
             out.append(bino)
         }
+        if model.altScenarioOn, let alt = DefocusSeries.sampled(id: "Alternativa", color: Theme.alt, width: 2.5, dashed: true) { model.altBinocularVA(at: $0) } {
+            out.append(alt)
+        }
         return out
     }
 
@@ -148,6 +191,18 @@ struct DefocusSection: View {
                     MetricCard(label: "Intermediária 66 cm", value: DefocusModel.snellen(fromLogMAR: inter), note: "\(Num.fmt(inter)) logMAR")
                     MetricCard(label: "Perto 40 cm", value: DefocusModel.snellen(fromLogMAR: near), note: "\(Num.fmt(near)) logMAR · \(DefocusModel.jaeger(fromLogMAR: near))")
                     MetricCard(label: "Estereopsia (longe)", value: model.stereopsis() ?? "—", note: "estimada")
+                }
+                if model.altScenarioOn, let lens = model.altLens,
+                   let aFar = model.altBinocularVA(at: DefocusModel.farDefocus),
+                   let aInter = model.altBinocularVA(at: DefocusModel.intermediateDefocus),
+                   let aNear = model.altBinocularVA(at: DefocusModel.nearDefocus) {
+                    (Text("Alternativa · \(model.altTitle) (\(lens.name)): ").bold()
+                     + Text("longe \(DefocusModel.snellen(fromLogMAR: aFar)) · 66 cm \(DefocusModel.snellen(fromLogMAR: aInter)) · 40 cm \(DefocusModel.snellen(fromLogMAR: aNear)) (\(DefocusModel.jaeger(fromLogMAR: aNear)))")
+                     + Text(" · plano: longe \(DefocusModel.snellen(fromLogMAR: far)) · 66 cm \(DefocusModel.snellen(fromLogMAR: inter)) · 40 cm \(DefocusModel.snellen(fromLogMAR: near))"))
+                        .font(.system(size: 12)).foregroundStyle(Theme.ink)
+                        .padding(10).frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Theme.alt.opacity(0.08)).clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.alt.opacity(0.5)))
                 }
             } else {
                 MutedText("selecione a LIO de ao menos um olho para ver as curvas e a simulação")
